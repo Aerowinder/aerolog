@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aerolog</title>
+<style>
+  :root, [data-theme="dark"] {
+    --bg: #0a0e14;
+    --surface: #12171f;
+    --surface2: #161c25;
+    --border: #1e2530;
+    --border-hi: #2a3140;
+    --text: #c5cdd8;
+    --text-dim: #5c6774;
+    --text-bright: #e6edf5;
+    --accent: #e8433a;
+    --accent-soft: #f08178;
+    --accent-glow: rgba(232, 67, 58, 0.12);
+    --green: #7fd962;
+    --yellow: #e8b339;
+    --blue: #53a8e8;
+    --purple: #c678dd;
+  }
+
+  [data-theme="light"] {
+    --bg: #fafaf7;
+    --surface: #ffffff;
+    --surface2: #f3f2ee;
+    --border: #e3e1db;
+    --border-hi: #c8c5bc;
+    --text: #2a2a28;
+    --text-dim: #787670;
+    --text-bright: #0f0f0e;
+    --accent: #c8321f;
+    --accent-soft: #d96651;
+    --accent-glow: rgba(200, 50, 31, 0.08);
+    --green: #4a8a2e;
+    --yellow: #b8881a;
+    --blue: #2a6fb8;
+    --purple: #8a3fa8;
+  }
+
+  @media (prefers-color-scheme: light) {
+    [data-theme="system"] {
+      --bg: #fafaf7;
+      --surface: #ffffff;
+      --surface2: #f3f2ee;
+      --border: #e3e1db;
+      --border-hi: #c8c5bc;
+      --text: #2a2a28;
+      --text-dim: #787670;
+      --text-bright: #0f0f0e;
+      --accent: #c8321f;
+      --accent-soft: #d96651;
+      --accent-glow: rgba(200, 50, 31, 0.08);
+      --green: #4a8a2e;
+      --yellow: #b8881a;
+      --blue: #2a6fb8;
+      --purple: #8a3fa8;
+    }
+  }
+
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --ctl-h: 38px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.5;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  /* -------- HEADER (combined with stats) -------- */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .header-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+  .header-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    min-width: 0;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 1.2rem;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .version {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-left: 0.4rem;
+  }
+
+  .stats-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--text-dim);
+    line-height: 1.35;
+  }
+  .stats-stack b { color: var(--text-bright); font-weight: 600; }
+
+  @media (max-width: 650px) {
+    .header { justify-content: center; }
+    .header-left { justify-content: center; flex-basis: 100%; }
+    .header-right { justify-content: center; flex-basis: 100%; }
+    .stats-stack { align-items: center; }
+  }
+
+  .header-btn {
+    font-family: var(--mono);
+    font-size: 1rem;
+    width: var(--ctl-h);
+    height: var(--ctl-h);
+    padding: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .header-btn:hover {
+    color: var(--text-bright);
+    border-color: var(--border-hi);
+    background: var(--border);
+  }
+  .header-btn svg { width: 18px; height: 18px; }
+
+  /* -------- CONNECTION STATUS PILL -------- */
+  .conn-status {
+    font-family: var(--mono);
+    font-size: 1rem;
+    height: var(--ctl-h);
+    padding: 0 0.85rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    background: var(--bg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .conn-status .dot {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .conn-status.ok .dot { background: var(--green); }
+  .conn-status.err .dot { background: var(--accent); }
+  .conn-status.paused .dot { background: var(--text-dim); }
+  .conn-status .host-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Progress bar at bottom of conn pill - always visible, color tracks status */
+  .conn-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 0%;
+    background: var(--text-dim);
+    transition: width 0.1s linear, background-color 0.2s;
+  }
+  .conn-status.ok .conn-progress { background: var(--green); }
+  .conn-status.err .conn-progress { background: var(--accent); }
+  .conn-status.paused .conn-progress { background: var(--text-dim); }
+
+  @media (max-width: 650px) {
+    .conn-status {
+      display: flex;
+      flex: 0 0 100%;
+      width: 100%;
+      max-width: 100%;
+      justify-content: center;
+    }
+  }
+
+  /* -------- TABS -------- */
+  .tabs {
+    display: flex;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    overflow-x: auto;
+    align-items: center;
+  }
+  .tab {
+    font-family: var(--mono);
+    font-size: 1rem;
+    padding: 0.75rem 1.2rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text); background: var(--surface2); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-sep {
+    width: 1px;
+    height: 1.4rem;
+    background: var(--border);
+    margin: 0 0.5rem;
+    flex-shrink: 0;
+  }
+  .tab-mgmt {
+    color: var(--text-dim);
+    font-size: 1rem;
+  }
+  .tab-mgmt:hover { color: var(--green); }
+
+  /* -------- TOOLBAR -------- */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 240px;
+    position: relative;
+  }
+  .search-box::before {
+    content: '>';
+    position: absolute;
+    left: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .search-box input {
+    width: 100%;
+    height: var(--ctl-h);
+    padding: 0 0.9rem 0 1.85rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 1rem;
+    outline: none;
+  }
+  .search-box input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+
+  .btn-search {
+    font-family: var(--mono);
+    font-size: 1rem;
+    height: var(--ctl-h);
+    padding: 0 1.2rem;
+    background: var(--accent);
+    color: #fff;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .btn-search:hover { opacity: 0.88; }
+
+  .mini-select {
+    height: var(--ctl-h);
+    padding: 0 0.55rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 1rem;
+    outline: none;
+    width: 130px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* -------- LOG TABLE -------- */
+  .log-wrap { overflow: auto; }
+  .log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 1rem;
+    table-layout: fixed;
+  }
+  .log-table th {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 0.6rem 0.85rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-dim);
+    font-size: 1rem;
+    user-select: none;
+    position: relative;
+  }
+  .log-table th:last-child { border-right: none; }
+  .log-table td {
+    padding: 0.45rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: top;
+  }
+  /* Message cell - positioned for the overlaid copy button */
+  .log-table td.msg {
+    white-space: normal;
+    position: relative;
+    padding-right: 2.6rem;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    color: var(--text);
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, border-color 0.15s, background-color 0.15s;
+    font-family: var(--mono);
+    font-size: 1.2rem;
+    line-height: 1.2;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  tr:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover {
+    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .log-table tr { transition: background 0.12s; }
+  .log-table tr:hover td { background: var(--surface2); }
+  .log-table tr.copied td { background: rgba(127,217,98,0.18) !important; }
+
+  /* Column resize handle */
+  .col-resize {
+    position: absolute;
+    top: 10%;
+    right: 0;
+    width: 4px;
+    height: 80%;
+    cursor: col-resize;
+    background: var(--border-hi);
+    opacity: 0.4;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .col-resize:hover, .col-resize.dragging {
+    background: var(--accent);
+    opacity: 1;
+  }
+
+  /* Cell color classes */
+  .ts { color: var(--text-dim); }
+  .host { color: var(--blue); }
+  .app { color: var(--purple); }
+  .msg { white-space: pre-wrap; word-break: break-word; }
+
+  /* Message content - wraps to 3 lines max with ellipsis */
+  .msg-content {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.4;
+    max-height: calc(3 * 1.4em);
+  }
+
+  /* Priority color coding */
+  .pri-emerg, .pri-alert, .pri-crit { color: var(--accent); font-weight: 600; }
+  .pri-err { color: var(--accent-soft); font-weight: 500; }
+  .pri-warn { color: var(--yellow); }
+  .pri-notice { color: var(--blue); }
+  .pri-info { color: var(--text); }
+  .pri-debug { color: var(--text-dim); opacity: 0.7; }
+
+  .empty {
+    text-align: center;
+    padding: 3rem !important;
+    color: var(--text-dim);
+  }
+  .error-row {
+    text-align: center;
+    padding: 2rem !important;
+    color: var(--accent);
+    font-weight: 500;
+    font-style: normal;
+  }
+
+  /* -------- PAGINATION -------- */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--text-dim);
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .pager-info { font-family: var(--mono); font-size: 1rem; }
+  .pager-buttons { display: flex; gap: 0.3rem; }
+  .pager-btn {
+    font-family: var(--mono);
+    font-size: 1rem;
+    padding: 0.45rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    cursor: pointer;
+    min-width: 42px;
+  }
+  .pager-btn:hover:not(:disabled) {
+    border-color: var(--border-hi);
+    color: var(--text-bright);
+  }
+  .pager-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .pager-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* -------- MODALS -------- */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.85rem;
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3 {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    margin-bottom: 1.1rem;
+    color: var(--text-bright);
+    font-weight: 600;
+  }
+  .modal h4 {
+    font-family: var(--mono);
+    font-size: 1rem;
+    margin-bottom: 0.65rem;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+  .modal label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+  }
+  .modal input[type="text"],
+  .modal textarea {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    outline: none;
+  }
+  .modal textarea { resize: vertical; min-height: 100px; }
+  .modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 1rem;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--border-hi); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-danger { color: var(--accent); }
+
+  .theme-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .theme-btn {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 1rem;
+    padding: 0.7rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .theme-btn:hover { border-color: var(--border-hi); }
+  .theme-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  hr.sep { border: none; border-top: 1px solid var(--border); margin: 1.35rem 0; }
+
+  .btn-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .hint {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--text-dim);
+    margin-top: -0.6rem;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  .group-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 0.5rem;
+    font-family: var(--mono);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .group-list-item:hover { border-color: var(--border-hi); background: var(--surface2); }
+  .group-list-item .edit-icon { color: var(--text-dim); font-size: 1rem; }
+  .group-list-item:hover .edit-icon { color: var(--accent); }
+
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 0.6rem 1.2rem;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 1rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s;
+    z-index: 200;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">Aerolog <span class="version" id="version-text"></span></div>
+  </div>
+  <span class="conn-status" id="conn-status">
+    <span class="dot"></span>
+    <span class="host-text">not connected</span>
+    <span class="conn-progress" id="conn-progress"></span>
+  </span>
+  <div class="header-right">
+    <div class="stats-stack">
+      <span id="stat-logs"><b>--</b> available logs</span>
+      <span id="stat-resp"><b>--</b> response time</span>
+    </div>
+    <button class="header-btn" onclick="openSettingsModal()" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="toolbar">
+  <div class="search-box">
+    <input type="text" id="search" placeholder="search (LogsQL), try: error, app:sshd, severity:&lt;4 (press enter)">
+  </div>
+  <button class="btn-search" onclick="doSearch()">Search</button>
+
+  <select class="mini-select" id="poll-interval" onchange="onPollIntervalChange()">
+    <option value="off">Poll: Off</option>
+    <option value="1">Poll: 1s</option>
+    <option value="5" selected>Poll: 5s</option>
+    <option value="10">Poll: 10s</option>
+    <option value="30">Poll: 30s</option>
+    <option value="60">Poll: 1m</option>
+  </select>
+  <select class="mini-select" id="page-size" onchange="onPageSizeChange()">
+    <option value="25">Rows: 25</option>
+    <option value="50">Rows: 50</option>
+    <option value="100" selected>Rows: 100</option>
+    <option value="250">Rows: 250</option>
+    <option value="500">Rows: 500</option>
+    <option value="1000">Rows: 1000</option>
+  </select>
+  <select class="mini-select" id="time-range" onchange="onTimeRangeChange()">
+    <option value="5m">Last: 5m</option>
+    <option value="15m">Last: 15m</option>
+    <option value="30m">Last: 30m</option>
+    <option value="1h" selected>Last: 1h</option>
+    <option value="3h">Last: 3h</option>
+    <option value="6h">Last: 6h</option>
+    <option value="12h">Last: 12h</option>
+    <option value="1d">Last: 1d</option>
+    <option value="1w">Last: 1w</option>
+    <option value="30d">Last: 30d</option>
+    <option value="90d">Last: 90d</option>
+    <option value="180d">Last: 180d</option>
+    <option value="1y">Last: 1y</option>
+  </select>
+</div>
+
+<div class="log-wrap">
+  <table class="log-table" id="log-table">
+    <thead><tr id="log-thead"></tr></thead>
+    <tbody id="log-body">
+      <tr><td class="empty">not connected - configure a server in settings</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="pagination">
+  <div class="pager-info" id="pager-info">Page 1 of 1</div>
+  <div class="pager-buttons" id="pager-buttons"></div>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h3>Settings</h3>
+
+    <h4>Theme</h4>
+    <div class="theme-row">
+      <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')">Light</button>
+      <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')">Dark</button>
+      <button class="theme-btn" data-theme-val="system" onclick="setTheme('system')">System</button>
+    </div>
+
+    <hr class="sep">
+
+    <h4>VictoriaLogs Server</h4>
+    <label>Server URL</label>
+    <input type="text" id="server-url" placeholder="http://localhost:9428">
+    <p class="hint">Full URL to your VictoriaLogs HTTP endpoint (no trailing slash). Defaults to http://localhost:9428.</p>
+
+    <hr class="sep">
+
+    <h4>Config Backup / Restore</h4>
+    <p class="hint" style="margin-top: 0;">Exports all settings (server, theme, page size, polling, aliases, tabs, columns) to a JSON file.</p>
+    <div class="btn-row">
+      <button class="btn" onclick="exportConfig()">Export</button>
+      <button class="btn" onclick="document.getElementById('import-file').click()">Import</button>
+      <button class="btn btn-danger" onclick="resetConfig()">Reset All</button>
+    </div>
+    <input type="file" id="import-file" accept="application/json" style="display: none;" onchange="importConfig(event)">
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSettingsModal()">Close</button>
+      <button class="btn btn-primary" onclick="saveAllSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tab management modal -->
+<div class="modal-overlay" id="group-modal">
+  <div class="modal">
+    <h3 id="group-modal-title">Tabs</h3>
+
+    <div id="group-list-view">
+      <div id="group-list"></div>
+      <hr class="sep">
+      <h4>Add New Tab</h4>
+      <label>Tab name</label>
+      <input type="text" id="new-group-name" placeholder="e.g. Web Servers">
+      <label>Hostnames (one per line, * wildcards, friendly names supported)</label>
+      <textarea id="new-group-hosts" placeholder="web-*&#10;router-01&#10;*-prod"></textarea>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeGroupModal()">Close</button>
+        <button class="btn btn-primary" onclick="addGroup()">Add Tab</button>
+      </div>
+    </div>
+
+    <div id="group-edit-view" style="display: none;">
+      <label>Tab name</label>
+      <input type="text" id="edit-group-name">
+      <label>Hostnames (one per line, * wildcards, friendly names supported)</label>
+      <textarea id="edit-group-hosts" rows="10"></textarea>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeGroupEdit()">Back</button>
+        <button class="btn btn-danger" onclick="deleteGroupFromEdit()">Delete</button>
+        <button class="btn btn-primary" onclick="saveGroupEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Aliases modal -->
+<div class="modal-overlay" id="aliases-modal">
+  <div class="modal">
+    <h3>Hostname Aliases</h3>
+    <label>Map raw hostnames or IPs to friendly names</label>
+    <textarea id="aliases-text" rows="10" placeholder="10.0.0.5 = router-01&#10;192.168.1.50 = firewall&#10;172.16.0.1 = core-switch"></textarea>
+    <p class="hint">One alias per line, <b>raw = friendly</b>. Aliases apply to the display, search queries, and tab groups. Use the friendly name in <code>host:</code> or <code>hostname:</code> filters.</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeAliasesModal()">Close</button>
+      <button class="btn btn-primary" onclick="saveAliases()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">copied</div>
+
+<script>
+// =============================================================================
+// Aerolog - VictoriaLogs frontend
+// =============================================================================
+
+const VERSION = '2026.04.08a';
+const DEFAULT_SERVER = 'http://localhost:9428';
+const PAGE_BUTTONS = 6;
+const DEFAULT_PAGE_SIZE = '100';
+const DEFAULT_POLL = '5';
+
+// Column definitions
+const COLUMN_DEFS = {
+  '_time':    { label: 'Timestamp', width: 220, render: renderTimestamp,  className: 'ts'   },
+  'hostname': { label: 'Hostname',  width: 200, render: renderHostname,   className: 'host' },
+  'priority': { label: 'Severity',  width: 130, render: renderPriority,   className: ''     },
+  'facility': { label: 'Facility',  width: 120, render: renderFacility,   className: 'app'  },
+  'app_name': { label: 'App',       width: 180, render: renderAppName,    className: 'app'  },
+  '_msg':     { label: 'Message',   width: null, render: renderMessage,   className: 'msg'  },
+};
+
+// Fixed column order - no longer reorderable or hideable
+const COLUMN_ORDER = ['_time', 'hostname', 'priority', 'facility', 'app_name', '_msg'];
+
+const DEFAULT_COLUMN_LAYOUT = {
+  widths: { '_time': 220, 'hostname': 200, 'priority': 130, 'facility': 120, 'app_name': 180 },
+};
+
+// Severity lookups (0-7 from VictoriaLogs' severity field)
+const SEVERITY_SHORT = {0:'emerg',1:'alert',2:'crit',3:'err',4:'warn',5:'notice',6:'info',7:'debug'};
+const SEVERITY_CLASS = {0:'pri-emerg',1:'pri-alert',2:'pri-crit',3:'pri-err',4:'pri-warn',5:'pri-notice',6:'pri-info',7:'pri-debug'};
+
+// ---- Persisted state ----
+let groups = JSON.parse(localStorage.getItem('aerolog_groups') || '[]');
+let serverUrl = localStorage.getItem('aerolog_server') || DEFAULT_SERVER;
+let currentTheme = localStorage.getItem('aerolog_theme') || 'dark';
+let pageSize = localStorage.getItem('aerolog_page_size') || DEFAULT_PAGE_SIZE;
+let savedPollInterval = localStorage.getItem('aerolog_poll_interval') || DEFAULT_POLL;
+let savedTimeRange = localStorage.getItem('aerolog_time_range') || '1h';
+let hostnameAliases = JSON.parse(localStorage.getItem('aerolog_aliases') || '{}');
+let columnLayout = JSON.parse(localStorage.getItem('aerolog_columns') || 'null') || structuredClone(DEFAULT_COLUMN_LAYOUT);
+
+// ---- Runtime state ----
+let activeGroupId = 0;
+let pollTimer = null;
+let progressTimer = null;
+let progressStart = 0;
+let editingGroupId = null;
+let currentPage = 1;
+let totalPages = 1;
+let totalCount = 0;
+let currentLogs = [];
+let aliasReverse = {};
+// Snapshot of committed search query - what poller actually uses
+let committedSearch = '';
+
+// Poll lifecycle state
+// pollSeq increments per poll. lastPollSettledSeq tracks which polls have completed
+// (success or fail). A deadline timer fires after the polling interval — if the latest
+// poll still hasn't settled by then, we consider it timed out and mark it failed.
+let pollSeq = 0;
+let lastPollSettledSeq = 0;
+let lastResponseMs = null;  // ms taken by the most recent successful poll, or null
+
+// Debug ring buffer - accessible from console as window.aerologDebug
+window.aerologDebug = {
+  polls: [],
+  rewrites: [],
+  maxEntries: 100,
+  show: function() {
+    console.log('--- Recent polls ---');
+    console.table(this.polls);
+    console.log('--- Recent query rewrites ---');
+    console.table(this.rewrites);
+    console.log('--- Current alias maps ---');
+    console.log('hostnameAliases (raw → friendly):', hostnameAliases);
+    console.log('aliasReverse (friendly → raw):', aliasReverse);
+  },
+  clear: function() { this.polls = []; this.rewrites = []; }
+};
+
+function debugLog(status, detail) {
+  window.aerologDebug.polls.push({
+    time: new Date().toISOString().substring(11, 23),
+    status,
+    detail,
+    page: currentPage,
+  });
+  if (window.aerologDebug.polls.length > window.aerologDebug.maxEntries) {
+    window.aerologDebug.polls.shift();
+  }
+}
+
+function debugRewrite(input, output, hits) {
+  window.aerologDebug.rewrites.push({
+    time: new Date().toISOString().substring(11, 23),
+    input,
+    output,
+    aliasHits: hits,
+  });
+  if (window.aerologDebug.rewrites.length > window.aerologDebug.maxEntries) {
+    window.aerologDebug.rewrites.shift();
+  }
+}
+
+document.documentElement.setAttribute('data-theme', currentTheme);
+rebuildAliasReverse();
+
+// ---- Utility ----
+function apiBase() {
+  return (serverUrl || DEFAULT_SERVER).replace(/\/+$/, '');
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatTime(t) {
+  if (!t) return '';
+  const d = new Date(t);
+  if (isNaN(d.getTime())) return t;
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function regexEscape(s) {
+  return s.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function wildcardToRegex(pattern) {
+  return regexEscape(pattern).replace(/\*/g, '.*');
+}
+
+function hasWildcard(pattern) {
+  return pattern.indexOf('*') !== -1;
+}
+
+// Rewrite friendly query shortcuts to LogsQL field names AND resolve hostname aliases
+function rewriteQuery(q) {
+  if (!q) return q;
+  const aliasHits = [];
+  const out = q.replace(
+    /(^|[\s(])(app|host|hostname|message|msg|time|timestamp)(\s*:)\s*("([^"]*)"|(\S+))/gi,
+    (match, lead, word, colon, _full, quoted, bare) => {
+      const wl = word.toLowerCase();
+      const fieldMap = {
+        'app': 'app_name', 'host': 'hostname', 'hostname': 'hostname',
+        'message': '_msg', 'msg': '_msg', 'time': '_time', 'timestamp': '_time'
+      };
+      const field = fieldMap[wl];
+      const value = quoted != null ? quoted : bare;
+
+      // Resolve hostname aliases - friendly → raw
+      let finalValue = value;
+      if (field === 'hostname' && Object.prototype.hasOwnProperty.call(aliasReverse, value)) {
+        finalValue = aliasReverse[value];
+        aliasHits.push(`${value} → ${finalValue}`);
+      }
+
+      // Re-quote if the value contains spaces or special chars, or was originally quoted
+      const needsQuotes = quoted != null || /[\s"]/.test(finalValue);
+      const outVal = needsQuotes ? `"${finalValue.replace(/"/g, '\\"')}"` : finalValue;
+      return `${lead}${field}${colon}${outVal}`;
+    }
+  );
+  if (q !== out || aliasHits.length > 0) {
+    debugRewrite(q, out, aliasHits);
+  }
+  return out;
+}
+
+function resolveHostname(h) { return aliasReverse[h] || h; }
+function displayHostname(h) { return hostnameAliases[h] || h; }
+
+function rebuildAliasReverse() {
+  aliasReverse = {};
+  for (const [raw, friendly] of Object.entries(hostnameAliases)) {
+    aliasReverse[friendly] = raw;
+  }
+}
+
+function parseAliases(text) {
+  const result = {};
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 0) continue;
+    const raw = trimmed.substring(0, eq).trim();
+    const friendly = trimmed.substring(eq + 1).trim();
+    if (raw && friendly) result[raw] = friendly;
+  }
+  return result;
+}
+
+function aliasesToText(aliases) {
+  return Object.entries(aliases).map(([r, f]) => `${r} = ${f}`).join('\n');
+}
+
+// ---- Query building ----
+function buildFilterClause() {
+  const search = rewriteQuery(committedSearch);
+  const timeRange = document.getElementById('time-range').value;
+
+  const parts = [`_time:${timeRange}`];
+
+  if (activeGroupId > 0) {
+    const group = groups.find(g => g.id === activeGroupId);
+    if (group && group.hosts.length > 0) {
+      const clauses = [];
+      for (const h of group.hosts) {
+        const resolved = resolveHostname(h);
+        if (hasWildcard(resolved)) {
+          clauses.push(`hostname:~"${wildcardToRegex(resolved)}"`);
+        } else {
+          clauses.push(`hostname:"${resolved}"`);
+        }
+      }
+      parts.push(`(${clauses.join(' OR ')})`);
+    }
+  }
+
+  if (search) parts.push(search);
+  return parts.join(' ');
+}
+
+function buildPagedQuery(page) {
+  const filter = buildFilterClause();
+  const size = parseInt(pageSize, 10);
+  const offset = (page - 1) * size;
+  if (offset > 0) {
+    return filter + ` | sort by (_time) desc | offset ${offset} | limit ${size}`;
+  }
+  return filter + ` | sort by (_time) desc | limit ${size}`;
+}
+
+function buildCountQuery() {
+  return buildFilterClause() + ' | stats count() as c';
+}
+
+// ---- API ----
+async function runQuery(query) {
+  const resp = await fetch(`${apiBase()}/select/logsql/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'query=' + encodeURIComponent(query),
+  });
+  if (!resp.ok) {
+    const err = new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    err.status = resp.status;
+    throw err;
+  }
+  const text = await resp.text();
+  return text.trim().split('\n')
+    .filter(l => l)
+    .map(l => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(l => l);
+}
+
+async function fetchAll() {
+  pollSeq++;
+  const mySeq = pollSeq;
+  const startTime = Date.now();
+
+  // Schedule a deadline matching the current polling interval. If this poll
+  // hasn't settled by then AND it's still the latest, we mark it failed.
+  const pollVal = document.getElementById('poll-interval').value;
+  if (pollVal !== 'off') {
+    const intervalMs = parseInt(pollVal, 10) * 1000;
+    setTimeout(() => {
+      if (mySeq === pollSeq && lastPollSettledSeq < mySeq) {
+        debugLog('timeout', `seq ${mySeq} did not settle within ${intervalMs}ms`);
+        lastResponseMs = null;
+        updateConnStatus('err', `Poll did not return within ${intervalMs}ms`);
+        renderResponseTime();
+      }
+    }, intervalMs);
+  }
+
+  let logs, logsErr;
+  try {
+    logs = await runQuery(buildPagedQuery(currentPage));
+  } catch (e) {
+    logsErr = e;
+  }
+
+  let count, countErr;
+  try {
+    const totals = await runQuery(buildCountQuery());
+    count = (totals[0] && totals[0].c) || 0;
+  } catch (e) {
+    countErr = e;
+  }
+
+  const elapsed = Date.now() - startTime;
+
+  // Stale-response guard: only the latest poll is allowed to update the UI
+  if (mySeq < pollSeq) {
+    debugLog('stale', `seq ${mySeq} < ${pollSeq}, dropped (${elapsed}ms)`);
+    return;
+  }
+
+  // Mark this poll as settled regardless of success/failure
+  lastPollSettledSeq = mySeq;
+
+  if (logsErr) {
+    debugLog('logs-fail', `${logsErr.message} (${elapsed}ms)`);
+    console.error('[aerolog] logs query failed:', logsErr);
+    const status = logsErr.status ? `HTTP ${logsErr.status}` : logsErr.message;
+    lastResponseMs = null;
+    updateConnStatus('err', `Logs query: ${status}`);
+    renderResponseTime();
+    if (currentLogs.length === 0) {
+      renderError(`Connection error: ${logsErr.message}`);
+    }
+    return;
+  }
+
+  if (countErr) {
+    debugLog('count-fail', `${countErr.message} (${elapsed}ms)`);
+    console.error('[aerolog] count query failed:', countErr);
+    // Keep the old totalCount on count failure
+  } else {
+    totalCount = count;
+  }
+
+  const size = parseInt(pageSize, 10);
+  totalPages = Math.max(1, Math.ceil(totalCount / size));
+
+  if (currentPage > totalPages) {
+    currentPage = totalPages;
+    return fetchAll();
+  }
+
+  currentLogs = logs;
+  lastResponseMs = elapsed;
+  renderLogs(logs);
+  renderStats(totalCount);
+  renderPagination();
+  renderResponseTime();
+
+  debugLog('ok', `${logs.length} logs, ${totalCount} total (${elapsed}ms)`);
+
+  updateConnStatus('ok');
+  resetProgressBar();
+}
+
+// ---- Cell renderers ----
+function renderTimestamp(log) {
+  return escapeHtml(formatTime(log._time));
+}
+
+function renderHostname(log) {
+  return escapeHtml(displayHostname(log.hostname || '-'));
+}
+
+function renderAppName(log) {
+  return escapeHtml(log.app_name || '-');
+}
+
+function renderMessage(log) {
+  return `<div class="msg-content">${escapeHtml(log._msg || '')}</div>`;
+}
+
+function renderPriority(log) {
+  // VictoriaLogs syslog ingestion exposes a separate `severity` field (0-7)
+  // extracted from the PRI byte. We use that - NOT `priority` (the raw PRI),
+  // since priority = facility*8 + severity and isn't directly meaningful.
+  let s = log.severity;
+  if (s == null || s === '') return '<span class="pri-info">-</span>';
+  const num = parseInt(s, 10);
+  if (isNaN(num)) return escapeHtml(String(s));
+  const name = SEVERITY_SHORT[num] || String(num);
+  const cls = SEVERITY_CLASS[num] || 'pri-info';
+  return `<span class="${cls}">${name}(${num})</span>`;
+}
+
+function renderFacility(log) {
+  // VictoriaLogs provides facility_keyword (string like "auth", "kern") and facility (number)
+  const kw = log.facility_keyword;
+  if (kw) return escapeHtml(kw);
+  if (log.facility != null && log.facility !== '') return escapeHtml(String(log.facility));
+  return '-';
+}
+
+// ---- Rendering ----
+function renderHeader() {
+  const thead = document.getElementById('log-thead');
+
+  let html = '';
+  for (const colId of COLUMN_ORDER) {
+    const def = COLUMN_DEFS[colId];
+    if (!def) continue;
+    const w = columnLayout.widths[colId];
+    const widthStyle = w ? `style="width: ${w}px;"` : '';
+    html += `<th data-col-id="${colId}" ${widthStyle}>${def.label}</th>`;
+  }
+
+  thead.innerHTML = html;
+
+  setupHeaderInteractions();
+}
+
+function setupHeaderInteractions() {
+  const ths = document.querySelectorAll('#log-thead th');
+  ths.forEach((th) => {
+    const colId = th.dataset.colId;
+
+    // Resize handle - skip the message column (it auto-fills)
+    const isLast = colId === '_msg';
+    if (!isLast) {
+      const handle = document.createElement('div');
+      handle.className = 'col-resize';
+      th.appendChild(handle);
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handle.classList.add('dragging');
+        const startX = e.clientX;
+        const startWidth = th.offsetWidth;
+        const onMove = (ev) => {
+          const newWidth = Math.max(60, startWidth + ev.clientX - startX);
+          th.style.width = newWidth + 'px';
+          columnLayout.widths[colId] = newWidth;
+        };
+        const onUp = () => {
+          handle.classList.remove('dragging');
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          saveColumnLayout();
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    }
+  });
+}
+
+function saveColumnLayout() {
+  localStorage.setItem('aerolog_columns', JSON.stringify(columnLayout));
+}
+
+function renderLogs(logs) {
+  const tbody = document.getElementById('log-body');
+  const colCount = COLUMN_ORDER.length;
+
+  if (!logs.length) {
+    tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty">No logs found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = logs.map((log, i) => {
+    let row = `<tr data-idx="${i}">`;
+    for (const colId of COLUMN_ORDER) {
+      const def = COLUMN_DEFS[colId];
+      if (!def) continue;
+      const cls = def.className ? ` class="${def.className}"` : '';
+      // The message column gets a relatively-positioned wrapper plus the copy button
+      if (colId === '_msg') {
+        row += `<td${cls}>${def.render(log)}<button class="copy-btn" onclick="copyRow(${i})" title="Copy row">⎘</button></td>`;
+      } else {
+        row += `<td${cls}>${def.render(log)}</td>`;
+      }
+    }
+    row += '</tr>';
+    return row;
+  }).join('');
+}
+
+function renderStats(total) {
+  document.getElementById('stat-logs').innerHTML =
+    `<b>${Number(total).toLocaleString()}</b> available logs`;
+}
+
+function renderResponseTime() {
+  const el = document.getElementById('stat-resp');
+  if (lastResponseMs == null) {
+    el.innerHTML = '<b>--</b> response time';
+    return;
+  }
+  let val;
+  if (lastResponseMs < 1000) {
+    val = `${lastResponseMs}ms`;
+  } else {
+    val = `${(lastResponseMs / 1000).toFixed(1)}s`;
+  }
+  el.innerHTML = `<b>${val}</b> response time`;
+}
+
+function renderError(msg) {
+  const colCount = COLUMN_ORDER.length;
+  document.getElementById('log-body').innerHTML =
+    `<tr><td colspan="${colCount}" class="error-row">${escapeHtml(msg)}</td></tr>`;
+}
+
+function updateConnStatus(state, errText) {
+  const el = document.getElementById('conn-status');
+  el.className = 'conn-status ' + (state || '');
+  // Always show the configured server URL - never hide it on error
+  const hostText = el.querySelector('.host-text');
+  hostText.textContent = apiBase();
+  if (state === 'err' && errText) {
+    el.title = errText;
+  } else {
+    el.removeAttribute('title');
+  }
+}
+
+function copyRow(idx) {
+  const log = currentLogs[idx];
+  if (!log) return;
+  const text = [
+    formatTime(log._time),
+    displayHostname(log.hostname || '-'),
+    log.app_name || '-',
+    log._msg || ''
+  ].join('\t');
+  navigator.clipboard.writeText(text).then(() => {
+    const row = document.querySelector(`tr[data-idx="${idx}"]`);
+    if (row) {
+      row.classList.add('copied');
+      setTimeout(() => row.classList.remove('copied'), 400);
+    }
+    showToast('copied row');
+  }).catch(() => showToast('copy failed'));
+}
+
+function showToast(text) {
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(showToast._tmr);
+  showToast._tmr = setTimeout(() => t.classList.remove('show'), 1400);
+}
+
+// ---- Pagination UI ----
+function renderPagination() {
+  document.getElementById('pager-info').textContent =
+    `Page ${currentPage} of ${totalPages} - ${Number(totalCount).toLocaleString()} logs`;
+
+  let start = Math.max(1, currentPage - Math.floor(PAGE_BUTTONS / 2));
+  let end = Math.min(totalPages, start + PAGE_BUTTONS - 1);
+  if (end - start + 1 < PAGE_BUTTONS) {
+    start = Math.max(1, end - PAGE_BUTTONS + 1);
+  }
+
+  const onFirst = currentPage === 1;
+  const onLast = currentPage === totalPages;
+
+  const btns = [];
+  btns.push(`<button class="pager-btn" onclick="goPage(1)" ${onFirst ? 'disabled' : ''} title="First">«</button>`);
+  btns.push(`<button class="pager-btn" onclick="goPage(${currentPage - 1})" ${onFirst ? 'disabled' : ''} title="Previous">‹</button>`);
+  for (let p = start; p <= end; p++) {
+    btns.push(`<button class="pager-btn ${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`);
+  }
+  btns.push(`<button class="pager-btn" onclick="goPage(${currentPage + 1})" ${onLast ? 'disabled' : ''} title="Next">›</button>`);
+  btns.push(`<button class="pager-btn" onclick="goPage(${totalPages})" ${onLast ? 'disabled' : ''} title="Last">»</button>`);
+
+  document.getElementById('pager-buttons').innerHTML = btns.join('');
+}
+
+function goPage(p) {
+  p = Math.max(1, Math.min(totalPages, p));
+  if (p === currentPage) return;
+  const wasOnPage1 = currentPage === 1;
+  currentPage = p;
+  if (wasOnPage1 && p !== 1) {
+    document.getElementById('poll-interval').value = 'off';
+    stopPolling();
+  }
+  fetchAll().then(() => {
+    // After the new page renders, scroll the pagination bar into view
+    const pager = document.querySelector('.pagination');
+    if (pager) pager.scrollIntoView({ block: 'end', behavior: 'instant' });
+  });
+}
+
+// ---- Tabs ----
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  let html = `<button class="tab ${activeGroupId === 0 ? 'active' : ''}" onclick="setActiveTab(0)">All Logs</button>`;
+  for (const g of groups) {
+    html += `<button class="tab ${activeGroupId === g.id ? 'active' : ''}" onclick="setActiveTab(${g.id})">${escapeHtml(g.name)}</button>`;
+  }
+  html += `<div class="tab-sep"></div>`;
+  html += `<button class="tab tab-mgmt" onclick="openGroupModal()">Tabs</button>`;
+  html += `<button class="tab tab-mgmt" onclick="openAliasesModal()">Aliases</button>`;
+  tabs.innerHTML = html;
+}
+
+function setActiveTab(id) {
+  activeGroupId = id;
+  currentPage = 1;
+  renderTabs();
+  fetchAll();
+}
+
+// ---- Tab management modal ----
+function renderGroupList() {
+  const list = document.getElementById('group-list');
+  if (!groups.length) {
+    list.innerHTML = '<p class="hint" style="margin: 0 0 0.5rem 0;">No tabs yet. Add one below.</p>';
+    return;
+  }
+  list.innerHTML = groups.map(g => `
+    <div class="group-list-item" onclick="openGroupEdit(${g.id})">
+      <span><b>${escapeHtml(g.name)}</b> <span style="color: var(--text-dim);">(${g.hosts.length} host${g.hosts.length === 1 ? '' : 's'})</span></span>
+      <span class="edit-icon">edit ›</span>
+    </div>
+  `).join('');
+}
+
+function openGroupEdit(id) {
+  const g = groups.find(g => g.id === id);
+  if (!g) return;
+  editingGroupId = id;
+  document.getElementById('edit-group-name').value = g.name;
+  document.getElementById('edit-group-hosts').value = g.hosts.join('\n');
+  document.getElementById('group-modal-title').textContent = `Edit: ${g.name}`;
+  document.getElementById('group-list-view').style.display = 'none';
+  document.getElementById('group-edit-view').style.display = 'block';
+}
+
+function closeGroupEdit() {
+  editingGroupId = null;
+  document.getElementById('group-modal-title').textContent = 'Tabs';
+  document.getElementById('group-list-view').style.display = 'block';
+  document.getElementById('group-edit-view').style.display = 'none';
+  renderGroupList();
+}
+
+function saveGroupEdit() {
+  if (editingGroupId == null) return;
+  const g = groups.find(g => g.id === editingGroupId);
+  if (!g) return;
+  const name = document.getElementById('edit-group-name').value.trim();
+  const hosts = document.getElementById('edit-group-hosts').value
+    .split('\n').map(h => h.trim()).filter(h => h);
+  if (!name) { alert('Tab name is required'); return; }
+  g.name = name;
+  g.hosts = hosts;
+  saveGroups();
+  renderTabs();
+  if (activeGroupId === g.id) fetchAll();
+  closeGroupEdit();
+}
+
+function deleteGroupFromEdit() {
+  if (editingGroupId == null) return;
+  if (!confirm('Delete this tab?')) return;
+  groups = groups.filter(g => g.id !== editingGroupId);
+  saveGroups();
+  if (activeGroupId === editingGroupId) { activeGroupId = 0; currentPage = 1; }
+  renderTabs();
+  fetchAll();
+  closeGroupEdit();
+}
+
+function openGroupModal() {
+  closeGroupEdit();
+  renderGroupList();
+  document.getElementById('group-modal').classList.add('open');
+}
+
+function closeGroupModal() {
+  document.getElementById('group-modal').classList.remove('open');
+  closeGroupEdit();
+}
+
+function addGroup() {
+  const name = document.getElementById('new-group-name').value.trim();
+  const hostsText = document.getElementById('new-group-hosts').value.trim();
+  if (!name || !hostsText) return;
+  const hosts = hostsText.split('\n').map(h => h.trim()).filter(h => h);
+  groups.push({ id: Date.now(), name, hosts });
+  saveGroups();
+  document.getElementById('new-group-name').value = '';
+  document.getElementById('new-group-hosts').value = '';
+  renderGroupList();
+  renderTabs();
+}
+
+function saveGroups() {
+  localStorage.setItem('aerolog_groups', JSON.stringify(groups));
+}
+
+// ---- Aliases modal ----
+function openAliasesModal() {
+  document.getElementById('aliases-text').value = aliasesToText(hostnameAliases);
+  document.getElementById('aliases-modal').classList.add('open');
+}
+
+function closeAliasesModal() {
+  document.getElementById('aliases-modal').classList.remove('open');
+}
+
+function saveAliases() {
+  hostnameAliases = parseAliases(document.getElementById('aliases-text').value);
+  localStorage.setItem('aerolog_aliases', JSON.stringify(hostnameAliases));
+  rebuildAliasReverse();
+  closeAliasesModal();
+  renderLogs(currentLogs);
+  fetchAll();
+}
+
+// ---- Settings modal ----
+function openSettingsModal() {
+  document.getElementById('server-url').value = serverUrl;
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.themeVal === currentTheme);
+  });
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function closeSettingsModal() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+
+function setTheme(theme) {
+  currentTheme = theme;
+  localStorage.setItem('aerolog_theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.themeVal === theme);
+  });
+}
+
+function saveAllSettings() {
+  const val = document.getElementById('server-url').value.trim().replace(/\/+$/, '');
+  serverUrl = val || DEFAULT_SERVER;
+  localStorage.setItem('aerolog_server', serverUrl);
+  closeSettingsModal();
+  currentPage = 1;
+  updateConnStatus('paused');  // refresh host text immediately
+  fetchAll();
+}
+
+function exportConfig() {
+  const config = {
+    version: 5,
+    exported_at: new Date().toISOString(),
+    server: serverUrl,
+    theme: currentTheme,
+    page_size: pageSize,
+    poll_interval: savedPollInterval,
+    time_range: savedTimeRange,
+    aliases: hostnameAliases,
+    groups: groups,
+    columns: columnLayout,
+  };
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `aerolog-config-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importConfig(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const config = JSON.parse(e.target.result);
+      if (typeof config.server === 'string') {
+        serverUrl = config.server || DEFAULT_SERVER;
+        localStorage.setItem('aerolog_server', serverUrl);
+      }
+      if (typeof config.theme === 'string' && ['light','dark','system'].includes(config.theme)) {
+        setTheme(config.theme);
+      }
+      if (config.page_size != null) {
+        pageSize = String(config.page_size);
+        localStorage.setItem('aerolog_page_size', pageSize);
+        document.getElementById('page-size').value = pageSize;
+      }
+      if (config.poll_interval != null) {
+        savedPollInterval = String(config.poll_interval);
+        localStorage.setItem('aerolog_poll_interval', savedPollInterval);
+        document.getElementById('poll-interval').value = savedPollInterval;
+      }
+      if (typeof config.time_range === 'string') {
+        savedTimeRange = config.time_range;
+        localStorage.setItem('aerolog_time_range', savedTimeRange);
+        document.getElementById('time-range').value = savedTimeRange;
+      }
+      if (config.aliases && typeof config.aliases === 'object') {
+        hostnameAliases = config.aliases;
+        localStorage.setItem('aerolog_aliases', JSON.stringify(hostnameAliases));
+        rebuildAliasReverse();
+      }
+      if (Array.isArray(config.groups)) {
+        groups = config.groups;
+        saveGroups();
+      }
+      if (config.columns && typeof config.columns === 'object') {
+        columnLayout = config.columns;
+        saveColumnLayout();
+      }
+      renderTabs();
+      renderHeader();
+      applyPolling();
+      currentPage = 1;
+      fetchAll();
+      alert('Config imported successfully');
+    } catch (err) {
+      alert('Failed to parse config file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function resetConfig() {
+  if (!confirm('Reset all settings? This clears server URL, theme, page size, polling, time range, aliases, tabs, and columns.')) return;
+  ['aerolog_server','aerolog_groups','aerolog_theme','aerolog_page_size',
+   'aerolog_poll_interval','aerolog_time_range','aerolog_aliases','aerolog_columns'
+  ].forEach(k => localStorage.removeItem(k));
+  serverUrl = DEFAULT_SERVER;
+  groups = [];
+  activeGroupId = 0;
+  pageSize = DEFAULT_PAGE_SIZE;
+  savedPollInterval = DEFAULT_POLL;
+  savedTimeRange = '1h';
+  hostnameAliases = {};
+  columnLayout = structuredClone(DEFAULT_COLUMN_LAYOUT);
+  committedSearch = '';
+  rebuildAliasReverse();
+  setTheme('dark');
+  currentPage = 1;
+  document.getElementById('page-size').value = pageSize;
+  document.getElementById('poll-interval').value = savedPollInterval;
+  document.getElementById('time-range').value = savedTimeRange;
+  document.getElementById('search').value = '';
+  renderTabs();
+  renderHeader();
+  applyPolling();
+  closeSettingsModal();
+  fetchAll();
+}
+
+// ---- Polling & progress bar ----
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  stopProgressBar();
+}
+
+function applyPolling() {
+  stopPolling();
+  const val = document.getElementById('poll-interval').value;
+  const bar = document.getElementById('conn-progress');
+  if (val === 'off') {
+    if (bar) bar.style.display = 'none';
+    updateConnStatus('paused');
+    return;
+  }
+  if (bar) bar.style.display = '';
+  const ms = parseInt(val, 10) * 1000;
+  // Fire one poll immediately so the bar and the first response are aligned
+  fetchAll();
+  pollTimer = setInterval(() => {
+    if (currentPage === 1) fetchAll();
+  }, ms);
+  startProgressBar(ms);
+}
+
+function startProgressBar(intervalMs) {
+  stopProgressBar();
+  const bar = document.getElementById('conn-progress');
+  bar.style.width = '0%';
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    const pct = Math.min(100, (elapsed / intervalMs) * 100);
+    bar.style.width = pct + '%';
+    if (pct >= 100) {
+      progressStart = Date.now();
+    }
+  }, 100);
+}
+
+function stopProgressBar() {
+  if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+}
+
+function resetProgressBar() {
+  // Called after a successful fetchAll - reset countdown to 0
+  progressStart = Date.now();
+  const bar = document.getElementById('conn-progress');
+  if (bar) bar.style.width = '0%';
+}
+
+function onPollIntervalChange() {
+  const val = document.getElementById('poll-interval').value;
+  if (val !== 'off' && currentPage !== 1) {
+    currentPage = 1;
+    fetchAll();
+  }
+  savedPollInterval = val;
+  localStorage.setItem('aerolog_poll_interval', savedPollInterval);
+  applyPolling();
+}
+
+function onPageSizeChange() {
+  pageSize = document.getElementById('page-size').value;
+  localStorage.setItem('aerolog_page_size', pageSize);
+  currentPage = 1;
+  fetchAll();
+}
+
+function onTimeRangeChange() {
+  savedTimeRange = document.getElementById('time-range').value;
+  localStorage.setItem('aerolog_time_range', savedTimeRange);
+  currentPage = 1;
+  fetchAll();
+}
+
+// ---- Search trigger ----
+function doSearch() {
+  // Snapshot the current input as the committed query
+  committedSearch = document.getElementById('search').value.trim();
+  currentPage = 1;
+  fetchAll();
+}
+
+// ---- Event wiring ----
+document.getElementById('search').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeGroupModal();
+    closeSettingsModal();
+    closeAliasesModal();
+  }
+});
+
+document.getElementById('group-modal').addEventListener('click', e => {
+  if (e.target.id === 'group-modal') closeGroupModal();
+});
+document.getElementById('settings-modal').addEventListener('click', e => {
+  if (e.target.id === 'settings-modal') closeSettingsModal();
+});
+document.getElementById('aliases-modal').addEventListener('click', e => {
+  if (e.target.id === 'aliases-modal') closeAliasesModal();
+});
+
+// ---- Init ----
+document.getElementById('version-text').textContent = VERSION;
+document.getElementById('page-size').value = pageSize;
+document.getElementById('poll-interval').value = savedPollInterval;
+document.getElementById('time-range').value = savedTimeRange;
+renderHeader();
+renderTabs();
+updateConnStatus('paused');
+// Always fetch once on load. If polling is on, applyPolling will also fetch - that's fine,
+// the second one will be deduped by the stale-response guard.
+if (savedPollInterval === 'off') fetchAll();
+applyPolling();
+</script>
+
+</body>
+</html>
