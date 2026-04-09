@@ -1,97 +1,194 @@
 # Aerolog
 
-Aerolog is single-file HTML frontend for VictoriaLogs. It is essentially VMUI with tabbing for device grouping and aliasing for easy lookups.
+Aerolog is a single-file HTML frontend for VictoriaLogs. It takes the core idea of VMUI and adds some quality-of-life features that make day-to-day log browsing less annoying.
 
 This project is vibe coded. The heavy lifting is done by LLMs with my oversight and extensive testing.
 
 ## What is Aerolog?
-Aerolog collects logs from an instance of VictoriaLogs, and displays them in a better looking and more functional way than VMUI offers. It also has a few big features that VMUI is missing.
 
-## What features separate Aerolog from VictoriaLogs VMUI?
-- Arrange hostnames in custom tabs, to view like-messages together without queries. You define the name of the tab, and which hosts report in that tab.
-- Map ugly hostnames or IPs to friendly names with aliases. If your UPS is returning the hostname `UPS(192.168.1.18)`, you can use aliases to rename it to `ups-01`, or whatever you'd like. Aliased hostnames are searchable.
-- Save complex queries for easier searching at a later time.
-- Backup and restore your config as JSON file. Since Aerolog uses localStorage, every system will need a copy of the JSON settings. Default settings are sane, but won't have your Tabs, Aliases, or Queries.
+Aerolog talks directly to a VictoriaLogs instance and displays the logs in a cleaner, more workflow-friendly UI. It does not replace VictoriaLogs, and it does not try to become a giant platform. It is a lightweight browser-based log viewer with some extra conveniences layered on top.
+
+If VMUI is enough for you, great. If you want tabs, aliases, saved queries, and a UI that is a little less raw, that is where Aerolog fits.
+
+## What does Aerolog add on top of VMUI?
+
+Aerolog is not trying to reinvent logging. The goal is to make common browsing and filtering tasks faster and less tedious.
+
+Current differentiators include:
+
+- **Tabs for host-based filtering**. Build tabs around groups of devices so you can jump straight to a slice of your environment without retyping queries every time.
+- **Hostname aliases**. Map ugly raw hostnames or IP-based names to something sane and readable.
+- **Alias-aware searching**. Friendly names work in tab definitions and search filters.
+- **Saved queries**. VMUI also supports saved queries, so this is not unique to Aerolog, but Aerolog keeps them in the same local browser config as the rest of its UI state.
+- **Config backup and restore**. Export your local settings to JSON and import them elsewhere.
 
 ## What Aerolog is not
-- Does not ingest logs. You need rsyslog, syslog-ng, vector, fluentd, or whatever you already use to get logs into VictoriaLogs. Aerolog only reads them.
-- Does not do alerting. Use vmalert or whatever else you like.
-- Does not do auth. Put it behind nginx basic auth, vmauth, a VPN, or something else. The dashboard talks directly to VictoriaLogs over HTTP, so secure that link however you secure your other internal tooling.
-- Does not have a backend. Everything lives in the browser. Settings persist to localStorage. There is no server-side state.
+
+Aerolog is intentionally small in scope.
+
+- It does **not** ingest logs. You still need rsyslog, syslog-ng, vector, fluent-bit, or whatever else you use to ship logs into VictoriaLogs.
+- It does **not** do alerting. Use vmalert or another alerting tool for that.
+- It does **not** do authentication. Put it behind nginx, vmauth, a VPN, or whatever access control you already trust.
+- It does **not** have a backend. Everything lives in the browser. Settings persist in localStorage. There is no server-side state.
 
 ## Setup
-Once you have VictoriaLogs running, just use the in-browser configuration setup of Aerolog to point it at your VictoriaLogs instance.
 
+Once VictoriaLogs is running and reachable from your browser, open Aerolog and configure the server in the settings modal.
 
-## Configuration that lives in the UI
+By default, the server field is `localhost:9428`.
 
-Click the gear icon in the top right of the page.
+If you enter a server without `http://` or `https://`, Aerolog assumes `https://` internally when making requests, but it keeps the field displayed exactly as you typed it.
+
+Examples:
+
+- `localhost:9428` → treated as `https://localhost:9428`
+- `http://logs-box:9428` → treated as HTTP
+- `https://logs.example.com` → treated as HTTPS
+
+## Configuration in the UI
+
+Click the gear icon in the top-right corner of the page.
+
+### Settings
 
 - **Theme**: light, dark, or follow system
-- **Server URL**: where Aerolog talks to VictoriaLogs
-- **Backup / Restore**: export your tabs, aliases, columns, and settings to a JSON file you can re-import on another browser or after a reset
+- **Server URL**: where Aerolog connects to VictoriaLogs
+- **Backup / Restore**: export your tabs, aliases, queries, columns, and other UI settings to a JSON file you can import elsewhere
 
 ### Tabs
 
-Click "Tabs" in the tab strip to manage hostname-based filter tabs. Each tab is a name plus a list of hostnames. Hostnames support `*` wildcards (`web-*`, `*-prod`, etc). Friendly hostnames from the alias list also work. When a tab is active, only logs from those hosts will be visible in the log display.
+Use the tab strip to create host-based filter tabs.
+
+Each tab has:
+- a tab name
+- a list of host entries, one per line
+
+Tab host matching rules:
+- No `*` means **exact match only**
+- `*` enables wildcard matching
+- Aliases are supported
+- Wildcards also work with aliased hostnames
+
+Examples:
+
+```text
+pve2
+web-*
+*-prod
+router-01
+```
+
+This means `pve2` matches only `pve2`, while `*-prod` matches anything ending in `-prod`.
 
 ### Aliases
 
-Click "Aliases" in the tab strip to set up hostname mappings. Format is one per line, `raw = friendly`. Example:
+Aliases map raw hostnames or IPs to friendly names.
 
+Format:
+
+```text
+raw = friendly
 ```
+
+Example:
+
+```text
 10.0.0.5 = router-01
 192.168.1.50 = firewall
+UPS(192.168.1.18) = ups-01
 super-long-host-name = shortname
 ```
 
-Aliases apply everywhere: the displayed hostname column, tab definitions, and search queries. So `host:router-01` will find logs from `10.0.0.5`.
+Aliases apply in several places:
+- hostname display in the table
+- tab definitions
+- search query rewrites
+
+So `host:router-01` can resolve to the raw device name or IP that actually exists in the logs.
 
 ### Queries
 
-Click "Tabs" in the tab strip to manage your saved queries.
+Use the Queries UI to save frequently used searches.
+
+This is handy for ugly filters you do not want to retype, like noisy auth failures, device-specific searches, or severity filters with additional conditions.
 
 ## Search syntax
 
-Aerolog passes queries straight through to VictoriaLogs as LogsQL with a few friendly rewrites:
+Aerolog sends queries through to VictoriaLogs as LogsQL, with a few friendly rewrites on top.
 
-| You type                     | Becomes                                |
-|------------------------------|----------------------------------------|
-| `error`                      | searches `_msg` for "error"            |
-| `host:router-01`             | `hostname:"10.0.0.5"` (alias resolved) |
-| `app:sshd`                   | `app_name:sshd`                        |
-| `msg:fail` or `message:fail` | `_msg:fail`                            |
-| `severity:<4`                | matches err, crit, alert, emerg        |
-| `severity:3`                 | matches only err                       |
+| You type                     | Becomes                                 |
+|------------------------------|-----------------------------------------|
+| `error`                      | searches `_msg` for `error`             |
+| `host:router-01`             | `hostname:="10.0.0.5"` (alias resolved) |
+| `app:sshd`                   | `app_name:sshd`                         |
+| `msg:fail` or `message:fail` | `_msg:fail`                             |
+| `severity:<4`                | matches err, crit, alert, emerg         |
+| `severity:3`                 | matches only err                        |
 
-The full LogsQL spec lives in the VictoriaLogs docs. Anything legal there works in the search box.
+Anything valid in LogsQL should still work. Aerolog is helping a little, not inventing a whole replacement query language.
 
 ## Polling and the connection pill
 
-The pill ay the top of the page is the connection status indicator. It shows:
+The status pill at the top of the page shows:
 
-- The configured server URL
-- A colored dot indicating state
-- A progress bar at the bottom that fills over the polling interval to indicate the amount of time until the next poll
+- the configured server value
+- a colored state indicator
+- a progress bar along the bottom that tracks time until the next poll
 
 Dot colors:
 
-- Green: last poll succeeded, no problems
-- Red:   last poll failed (will retry)
-- Gray:  polling is intentionally paused by user
+- **Green**: last poll succeeded and polling is active
+- **Red**: last poll failed and polling is active
+- **Gray**: polling is paused
 
-When you pause polling (Poll: Off in the toolbar), the progress bar disappears entirely and the dot goes gray. When you resume, an immediate poll fires and the bar starts from zero, in sync with the first poll.
+A few behavior notes:
 
-## The settings that matter
+- The configured hostname stays visible in the pill even if polling fails
+- If polling is paused, the indicator goes gray even if the server is offline
+- The progress bar is part of the pill state and remains visible so you can tell the UI is alive and what state it is in
 
-In the toolbar:
+## Toolbar settings
 
-- **Poll**: how often to refresh. Options are Off, 1s, 5s, 10s, 30s, 1m.
-- **Rows**: how many rows to display per page. 25 to 1000.
-- **Last**: time range to query, from 5 minutes back to 1 year.
+The main toolbar controls the live view:
 
-These all save automatically across reloads.
+- **Poll**: refresh interval. Off, 1s, 5s, 10s, 30s, 1m
+- **Rows**: rows per page. 25 to 1000
+- **Last**: query time range, from 5 minutes to 1 year
 
-## Pagination
+These settings persist in localStorage.
 
-The page numbers at the bottom let you walk back through history. As soon as you leave page 1, polling automatically pauses (because new logs would shift the offsets and confuse things). When you come back to page 1, polling stays paused until you manually re-enable it. This is intentional. If you re-enable polling while on a non-page-1 view, the page snaps back to 1 first.
+## Pagination behavior
+
+The pager at the bottom lets you walk back through history.
+
+When you leave page 1, polling pauses automatically. That is intentional. Live polling while you are paging backward would cause offsets to shift and make the view jump around like an idiot.
+
+When you return to page 1, polling stays paused until you manually turn it back on.
+
+If you enable polling while viewing any page other than page 1, Aerolog snaps back to page 1 first.
+
+## Persistence
+
+Aerolog stores its UI state in the browser using localStorage. That includes things like:
+
+- server setting
+- theme
+- tabs
+- aliases
+- saved queries
+- selected columns
+- toolbar preferences
+
+Because of that, a fresh browser or machine will not have your setup unless you import a previously exported config JSON.
+
+## Current design goals
+
+Aerolog is trying to be:
+
+- small
+- readable
+- easy to run
+- easy to back up
+- useful without needing a backend or a stack of extra services
+
+It is not trying to become a full observability suite. There are already enough of those, and most of them are bloated.

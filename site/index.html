@@ -203,6 +203,7 @@
     left: 0;
     height: 2px;
     width: 0%;
+    min-width: 2px;
     background: var(--text-dim);
     transition: width 0.1s linear, background-color 0.2s;
   }
@@ -429,6 +430,7 @@
     white-space: normal;
     line-height: 1.4;
     max-height: calc(3 * 1.4em);
+    font-size: 1em;
   }
 
   /* Priority color coding */
@@ -600,7 +602,7 @@
     line-height: 1.5;
   }
 
-  .group-list-item {
+  .list-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -613,9 +615,9 @@
     cursor: pointer;
     transition: all 0.15s;
   }
-  .group-list-item:hover { border-color: var(--border-hi); background: var(--surface2); }
-  .group-list-item .edit-icon { color: var(--text-dim); font-size: 1rem; }
-  .group-list-item:hover .edit-icon { color: var(--accent); }
+  .list-item:hover { border-color: var(--border-hi); background: var(--surface2); }
+  .list-item .edit-icon { color: var(--text-dim); font-size: 1rem; }
+  .list-item:hover .edit-icon { color: var(--accent); }
 
   .toast {
     position: fixed;
@@ -736,8 +738,8 @@
 
     <h4>VictoriaLogs Server</h4>
     <label>Server URL</label>
-    <input type="text" id="server-url" placeholder="http://localhost:9428">
-    <p class="hint">Full URL to your VictoriaLogs HTTP endpoint (no trailing slash). Defaults to http://localhost:9428.</p>
+    <input type="text" id="server-url" placeholder="localhost:9428">
+    <p class="hint">VictoriaLogs server (no trailing slash). Defaults to localhost:9428. If you omit http:// or https://, Aerolog assumes https:// internally.</p>
 
     <hr class="sep">
 
@@ -758,33 +760,33 @@
 </div>
 
 <!-- Tab management modal -->
-<div class="modal-overlay" id="group-modal">
+<div class="modal-overlay" id="tab-modal">
   <div class="modal">
-    <h3 id="group-modal-title">Tabs</h3>
+    <h3 id="tab-modal-title">Tabs</h3>
 
-    <div id="group-list-view">
-      <div id="group-list"></div>
+    <div id="tab-list-view">
+      <div id="tab-list"></div>
       <hr class="sep">
       <h4>Add New Tab</h4>
       <label>Tab name</label>
-      <input type="text" id="new-group-name" placeholder="e.g. Web Servers">
-      <label>Hostnames (one per line, * wildcards, friendly names supported)</label>
-      <textarea id="new-group-hosts" placeholder="web-*&#10;router-01&#10;*-prod"></textarea>
+      <input type="text" id="new-tab-name" placeholder="e.g. Web Servers">
+      <label>Hostnames (one per line, exact match unless * is used; aliases supported)</label>
+      <textarea id="new-tab-hosts" placeholder="pve2&#10;web-*&#10;router-01"></textarea>
       <div class="modal-actions">
-        <button class="btn" onclick="closeGroupModal()">Close</button>
-        <button class="btn btn-primary" onclick="addGroup()">Add Tab</button>
+        <button class="btn" onclick="closeTabModal()">Close</button>
+        <button class="btn btn-primary" onclick="addTab()">Add Tab</button>
       </div>
     </div>
 
-    <div id="group-edit-view" style="display: none;">
+    <div id="tab-edit-view" style="display: none;">
       <label>Tab name</label>
-      <input type="text" id="edit-group-name">
-      <label>Hostnames (one per line, * wildcards, friendly names supported)</label>
-      <textarea id="edit-group-hosts" rows="10"></textarea>
+      <input type="text" id="edit-tab-name">
+      <label>Hostnames (one per line, exact match unless * is used; aliases supported)</label>
+      <textarea id="edit-tab-hosts" rows="10"></textarea>
       <div class="modal-actions">
-        <button class="btn" onclick="closeGroupEdit()">Back</button>
-        <button class="btn btn-danger" onclick="deleteGroupFromEdit()">Delete</button>
-        <button class="btn btn-primary" onclick="saveGroupEdit()">Save</button>
+        <button class="btn" onclick="closeTabEdit()">Back</button>
+        <button class="btn btn-danger" onclick="deleteTabFromEdit()">Delete</button>
+        <button class="btn btn-primary" onclick="saveTabEdit()">Save</button>
       </div>
     </div>
   </div>
@@ -796,7 +798,7 @@
     <h3>Hostname Aliases</h3>
     <label>Map raw hostnames or IPs to friendly names</label>
     <textarea id="aliases-text" rows="10" placeholder="10.0.0.5 = router-01&#10;192.168.1.50 = firewall&#10;172.16.0.1 = core-switch"></textarea>
-    <p class="hint">One alias per line, <b>raw = friendly</b>. Aliases apply to the display, search queries, and tab groups. Use the friendly name in <code>host:</code> or <code>hostname:</code> filters.</p>
+    <p class="hint">One alias per line, <b>raw = friendly</b>. Aliases apply to the display, search queries, and tabs. Use the friendly name in <code>host:</code> or <code>hostname:</code> filters. Exact matches stay exact; use <code>*</code> when you want fuzzy matching.</p>
     <div class="modal-actions">
       <button class="btn" onclick="closeAliasesModal()">Close</button>
       <button class="btn btn-primary" onclick="saveAliases()">Save</button>
@@ -844,8 +846,8 @@
 // Aerolog - VictoriaLogs frontend
 // =============================================================================
 
-const VERSION = '2026.04.09a';
-const DEFAULT_SERVER = 'http://localhost:9428';
+const VERSION = '2026.04.09b';
+const DEFAULT_SERVER = 'localhost:9428';
 const DEFAULT_PAGE_SIZE = '100';
 const DEFAULT_POLL = '5';
 const DEFAULT_TIME_RANGE = '1h';
@@ -885,7 +887,7 @@ const SEVERITY_SHORT = {0:'emerg',1:'alert',2:'crit',3:'err',4:'warn',5:'notice'
 const SEVERITY_CLASS = {0:'pri-emerg',1:'pri-alert',2:'pri-crit',3:'pri-err',4:'pri-warn',5:'pri-notice',6:'pri-info',7:'pri-debug'};
 
 // ---- Persisted state ----
-let groups = JSON.parse(localStorage.getItem('aerolog_groups') || '[]');
+let tabs = JSON.parse(localStorage.getItem('aerolog_tabs') || '[]');
 let serverUrl = localStorage.getItem('aerolog_server') || DEFAULT_SERVER;
 let currentTheme = localStorage.getItem('aerolog_theme') || 'dark';
 let pageSize = localStorage.getItem('aerolog_page_size') || DEFAULT_PAGE_SIZE;
@@ -896,11 +898,11 @@ let savedQueries = JSON.parse(localStorage.getItem('aerolog_queries') || '[]');
 let columnLayout = JSON.parse(localStorage.getItem('aerolog_columns') || 'null') || structuredClone(DEFAULT_COLUMN_LAYOUT);
 
 // ---- Runtime state ----
-let activeGroupId = 0;
+let activeTabId = 0;
 let pollTimer = null;
 let progressTimer = null;
 let progressStart = 0;
-let editingGroupId = null;
+let editingTabId = null;
 let editingQueryId = null;
 let currentPage = 1;
 let totalPages = 1;
@@ -918,53 +920,31 @@ let pollSeq = 0;
 let lastPollSettledSeq = 0;
 let lastResponseMs = null;  // ms taken by the most recent successful poll, or null
 
-// Debug ring buffer - accessible from console as window.aerologDebug
-window.aerologDebug = {
-  polls: [],
-  rewrites: [],
-  maxEntries: 100,
-  show: function() {
-    console.log('--- Recent polls ---');
-    console.table(this.polls);
-    console.log('--- Recent query rewrites ---');
-    console.table(this.rewrites);
-    console.log('--- Current alias maps ---');
-    console.log('hostnameAliases (raw → friendly):', hostnameAliases);
-    console.log('aliasReverse (friendly → raw):', aliasReverse);
-  },
-  clear: function() { this.polls = []; this.rewrites = []; }
-};
-
-function debugLog(status, detail) {
-  window.aerologDebug.polls.push({
-    time: new Date().toISOString().substring(11, 23),
-    status,
-    detail,
-    page: currentPage,
-  });
-  if (window.aerologDebug.polls.length > window.aerologDebug.maxEntries) {
-    window.aerologDebug.polls.shift();
-  }
-}
-
-function debugRewrite(input, output, hits) {
-  window.aerologDebug.rewrites.push({
-    time: new Date().toISOString().substring(11, 23),
-    input,
-    output,
-    aliasHits: hits,
-  });
-  if (window.aerologDebug.rewrites.length > window.aerologDebug.maxEntries) {
-    window.aerologDebug.rewrites.shift();
-  }
-}
-
 document.documentElement.setAttribute('data-theme', currentTheme);
 rebuildAliasReverse();
 
 // ---- Utility ----
+function normalizeServerUrl(raw) {
+  const trimmed = String(raw || '').trim().replace(/\/+$/, '');
+  if (!trimmed) return DEFAULT_SERVER;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 function apiBase() {
-  return (serverUrl || DEFAULT_SERVER).replace(/\/+$/, '');
+  return normalizeServerUrl(serverUrl || DEFAULT_SERVER);
+}
+
+function displayServerUrl() {
+  return serverUrl || DEFAULT_SERVER;
+}
+
+function getPollValue() {
+  return document.getElementById('poll-interval').value;
+}
+
+function isPollingActive() {
+  return getPollValue() !== 'off' && currentPage === 1;
 }
 
 function escapeHtml(s) {
@@ -989,19 +969,47 @@ function regexEscape(s) {
 }
 
 function wildcardToRegex(pattern) {
-  return regexEscape(pattern).replace(/\*/g, '.*');
+  return '^' + regexEscape(pattern).replace(/\*/g, '.*') + '$';
 }
 
 function hasWildcard(pattern) {
   return pattern.indexOf('*') !== -1;
 }
 
-// Rewrite friendly query shortcuts to LogsQL field names AND resolve hostname aliases
+function escapeLogsQlString(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/\"/g, '\\\"');
+}
+
+function getAliasWildcardMatches(pattern) {
+  if (!hasWildcard(pattern)) return [];
+  const re = new RegExp(wildcardToRegex(pattern), 'i');
+  return Object.entries(hostnameAliases)
+    .filter(([, friendly]) => re.test(friendly))
+    .map(([raw]) => raw);
+}
+
+function buildHostnameClause(pattern) {
+  const value = String(pattern || '').trim();
+  if (!value) return '';
+
+  if (!hasWildcard(value)) {
+    const exactRaw = aliasReverse[value] || value;
+    return `hostname:="${escapeLogsQlString(exactRaw)}"`;
+  }
+
+  const clauses = [`hostname:~"${escapeLogsQlString(wildcardToRegex(value))}"`];
+  for (const raw of getAliasWildcardMatches(value)) {
+    const exactClause = `hostname:="${escapeLogsQlString(raw)}"`;
+    if (!clauses.includes(exactClause)) clauses.push(exactClause);
+  }
+  return clauses.length === 1 ? clauses[0] : `(${clauses.join(' OR ')})`;
+}
+
+// Rewrite friendly query shortcuts to LogsQL field names and normalize hostname filters.
 function rewriteQuery(q) {
   if (!q) return q;
-  const aliasHits = [];
-  const out = q.replace(
-    /(^|[\s(])(app|host|hostname|message|msg|time|timestamp)(\s*:)\s*("([^"]*)"|(\S+))/gi,
+  return q.replace(
+    /(^|[\s(])(app|host|hostname|message|msg|time|timestamp)(\s*:\s*)("([^"]*)"|(\S+))/gi,
     (match, lead, word, colon, _full, quoted, bare) => {
       const wl = word.toLowerCase();
       const fieldMap = {
@@ -1011,26 +1019,17 @@ function rewriteQuery(q) {
       const field = fieldMap[wl];
       const value = quoted != null ? quoted : bare;
 
-      // Resolve hostname aliases - friendly → raw
-      let finalValue = value;
-      if (field === 'hostname' && Object.prototype.hasOwnProperty.call(aliasReverse, value)) {
-        finalValue = aliasReverse[value];
-        aliasHits.push(`${value} → ${finalValue}`);
+      if (field === 'hostname') {
+        return `${lead}${buildHostnameClause(value)}`;
       }
 
-      // Re-quote if the value contains spaces or special chars, or was originally quoted
-      const needsQuotes = quoted != null || /[\s"]/.test(finalValue);
-      const outVal = needsQuotes ? `"${finalValue.replace(/"/g, '\\"')}"` : finalValue;
-      return `${lead}${field}${colon}${outVal}`;
+      const needsQuotes = quoted != null || /[\s"]/.test(value);
+      const outVal = needsQuotes ? `"${String(value).replace(/"/g, '\\"')}"` : value;
+      return `${lead}${field}:${outVal}`;
     }
   );
-  if (q !== out || aliasHits.length > 0) {
-    debugRewrite(q, out, aliasHits);
-  }
-  return out;
 }
 
-function resolveHostname(h) { return aliasReverse[h] || h; }
 function displayHostname(h) { return hostnameAliases[h] || h; }
 
 function rebuildAliasReverse() {
@@ -1065,19 +1064,11 @@ function buildFilterClause() {
 
   const parts = [`_time:${timeRange}`];
 
-  if (activeGroupId > 0) {
-    const group = groups.find(g => g.id === activeGroupId);
-    if (group && group.hosts.length > 0) {
-      const clauses = [];
-      for (const h of group.hosts) {
-        const resolved = resolveHostname(h);
-        if (hasWildcard(resolved)) {
-          clauses.push(`hostname:~"${wildcardToRegex(resolved)}"`);
-        } else {
-          clauses.push(`hostname:"${resolved}"`);
-        }
-      }
-      parts.push(`(${clauses.join(' OR ')})`);
+  if (activeTabId > 0) {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (tab && tab.hosts.length > 0) {
+      const clauses = tab.hosts.map(buildHostnameClause).filter(Boolean);
+      if (clauses.length) parts.push(`(${clauses.join(' OR ')})`);
     }
   }
 
@@ -1123,12 +1114,11 @@ async function fetchAll() {
 
   // Schedule a deadline matching the current polling interval. If this poll
   // hasn't settled by then AND it's still the latest, we mark it failed.
-  const pollVal = document.getElementById('poll-interval').value;
+  const pollVal = getPollValue();
   if (pollVal !== 'off') {
     const intervalMs = parseInt(pollVal, 10) * 1000;
     setTimeout(() => {
       if (mySeq === pollSeq && lastPollSettledSeq < mySeq) {
-        debugLog('timeout', `seq ${mySeq} did not settle within ${intervalMs}ms`);
         lastResponseMs = null;
         updateConnStatus('err', `Poll did not return within ${intervalMs}ms`);
         renderResponseTime();
@@ -1136,26 +1126,30 @@ async function fetchAll() {
     }, intervalMs);
   }
 
+  const [logsResult, countResult] = await Promise.allSettled([
+    runQuery(buildPagedQuery(currentPage)),
+    runQuery(buildCountQuery()),
+  ]);
+
   let logs, logsErr;
-  try {
-    logs = await runQuery(buildPagedQuery(currentPage));
-  } catch (e) {
-    logsErr = e;
+  if (logsResult.status === 'fulfilled') {
+    logs = logsResult.value;
+  } else {
+    logsErr = logsResult.reason;
   }
 
   let count, countErr;
-  try {
-    const totals = await runQuery(buildCountQuery());
+  if (countResult.status === 'fulfilled') {
+    const totals = countResult.value;
     count = (totals[0] && totals[0].c) || 0;
-  } catch (e) {
-    countErr = e;
+  } else {
+    countErr = countResult.reason;
   }
 
   const elapsed = Date.now() - startTime;
 
   // Stale-response guard: only the latest poll is allowed to update the UI
   if (mySeq < pollSeq) {
-    debugLog('stale', `seq ${mySeq} < ${pollSeq}, dropped (${elapsed}ms)`);
     return;
   }
 
@@ -1163,11 +1157,10 @@ async function fetchAll() {
   lastPollSettledSeq = mySeq;
 
   if (logsErr) {
-    debugLog('logs-fail', `${logsErr.message} (${elapsed}ms)`);
     console.error('[aerolog] logs query failed:', logsErr);
     const status = logsErr.status ? `HTTP ${logsErr.status}` : logsErr.message;
     lastResponseMs = null;
-    updateConnStatus('err', `Logs query: ${status}`);
+    updateConnStatus(isPollingActive() ? 'err' : 'paused', `Logs query: ${status}`);
     renderResponseTime();
     if (currentLogs.length === 0) {
       renderError(`Connection error: ${logsErr.message}`);
@@ -1176,7 +1169,6 @@ async function fetchAll() {
   }
 
   if (countErr) {
-    debugLog('count-fail', `${countErr.message} (${elapsed}ms)`);
     console.error('[aerolog] count query failed:', countErr);
     // Keep the old totalCount on count failure
   } else {
@@ -1198,9 +1190,7 @@ async function fetchAll() {
   renderPagination();
   renderResponseTime();
 
-  debugLog('ok', `${logs.length} logs, ${totalCount} total (${elapsed}ms)`);
-
-  updateConnStatus('ok');
+  updateConnStatus(isPollingActive() ? 'ok' : 'paused');
   resetProgressBar();
 }
 
@@ -1343,14 +1333,29 @@ function renderError(msg) {
 function updateConnStatus(state, errText) {
   const el = document.getElementById('conn-status');
   el.className = 'conn-status ' + (state || '');
-  // Always show the configured server URL - never hide it on error
   const hostText = el.querySelector('.host-text');
-  hostText.textContent = apiBase();
-  if (state === 'err' && errText) {
-    el.title = errText;
-  } else {
-    el.removeAttribute('title');
+  const host = displayServerUrl();
+
+  if (state === 'err') {
+    hostText.textContent = host;
+    el.title = errText ? `${host} — ${errText}` : host;
+    return;
   }
+
+  if (state === 'ok') {
+    hostText.textContent = host;
+    el.title = host;
+    return;
+  }
+
+  if (state === 'paused') {
+    hostText.textContent = host;
+    el.title = 'polling paused';
+    return;
+  }
+
+  hostText.textContent = 'not connected';
+  el.removeAttribute('title');
 }
 
 function copyRow(idx) {
@@ -1429,112 +1434,115 @@ function goPage(p) {
 
 // ---- Tabs ----
 function renderTabs() {
-  const tabs = document.getElementById('tabs');
-  let html = `<button class="tab ${activeGroupId === 0 ? 'active' : ''}" onclick="setActiveTab(0)">All Logs</button>`;
-  for (const g of groups) {
-    html += `<button class="tab ${activeGroupId === g.id ? 'active' : ''}" onclick="setActiveTab(${g.id})">${escapeHtml(g.name)}</button>`;
+  const tabsEl = document.getElementById('tabs');
+  let html = `<button class="tab ${activeTabId === 0 ? 'active' : ''}" onclick="setActiveTab(0)">All Logs</button>`;
+  for (const tab of tabs) {
+    html += `<button class="tab ${activeTabId === tab.id ? 'active' : ''}" onclick="setActiveTab(${tab.id})">${escapeHtml(tab.name)}</button>`;
   }
   html += `<div class="tab-sep"></div>`;
-  html += `<button class="tab tab-mgmt" onclick="openGroupModal()">Tabs</button>`;
+  html += `<button class="tab tab-mgmt" onclick="openTabModal()">Tabs</button>`;
   html += `<button class="tab tab-mgmt" onclick="openAliasesModal()">Aliases</button>`;
   html += `<button class="tab tab-mgmt" onclick="openQueriesModal()">Queries</button>`;
-  tabs.innerHTML = html;
+  tabsEl.innerHTML = html;
 }
 
 function setActiveTab(id) {
-  activeGroupId = id;
+  activeTabId = id;
   currentPage = 1;
   renderTabs();
   fetchAll();
 }
 
 // ---- Tab management modal ----
-function renderGroupList() {
-  const list = document.getElementById('group-list');
-  if (!groups.length) {
+function renderTabList() {
+  const list = document.getElementById('tab-list');
+  if (!tabs.length) {
     list.innerHTML = '<p class="hint" style="margin: 0 0 0.5rem 0;">No tabs yet. Add one below.</p>';
     return;
   }
-  list.innerHTML = groups.map(g => `
-    <div class="group-list-item" onclick="openGroupEdit(${g.id})">
-      <span><b>${escapeHtml(g.name)}</b> <span style="color: var(--text-dim);">(${g.hosts.length} host${g.hosts.length === 1 ? '' : 's'})</span></span>
+  list.innerHTML = tabs.map(tab => `
+    <div class="list-item" onclick="openTabEdit(${tab.id})">
+      <span><b>${escapeHtml(tab.name)}</b> <span style="color: var(--text-dim);">(${tab.hosts.length} host${tab.hosts.length === 1 ? '' : 's'})</span></span>
       <span class="edit-icon">view</span>
     </div>
   `).join('');
 }
 
-function openGroupEdit(id) {
-  const g = groups.find(g => g.id === id);
-  if (!g) return;
-  editingGroupId = id;
-  document.getElementById('edit-group-name').value = g.name;
-  document.getElementById('edit-group-hosts').value = g.hosts.join('\n');
-  document.getElementById('group-modal-title').textContent = `Edit: ${g.name}`;
-  document.getElementById('group-list-view').style.display = 'none';
-  document.getElementById('group-edit-view').style.display = 'block';
+function openTabEdit(id) {
+  const tab = tabs.find(t => t.id === id);
+  if (!tab) return;
+  editingTabId = id;
+  document.getElementById('edit-tab-name').value = tab.name;
+  document.getElementById('edit-tab-hosts').value = tab.hosts.join('\n');
+  document.getElementById('tab-modal-title').textContent = `Edit: ${tab.name}`;
+  document.getElementById('tab-list-view').style.display = 'none';
+  document.getElementById('tab-edit-view').style.display = 'block';
 }
 
-function closeGroupEdit() {
-  editingGroupId = null;
-  document.getElementById('group-modal-title').textContent = 'Tabs';
-  document.getElementById('group-list-view').style.display = 'block';
-  document.getElementById('group-edit-view').style.display = 'none';
-  renderGroupList();
+function closeTabEdit() {
+  editingTabId = null;
+  document.getElementById('tab-modal-title').textContent = 'Tabs';
+  document.getElementById('tab-list-view').style.display = 'block';
+  document.getElementById('tab-edit-view').style.display = 'none';
+  renderTabList();
 }
 
-function saveGroupEdit() {
-  if (editingGroupId == null) return;
-  const g = groups.find(g => g.id === editingGroupId);
-  if (!g) return;
-  const name = document.getElementById('edit-group-name').value.trim();
-  const hosts = document.getElementById('edit-group-hosts').value
+function saveTabEdit() {
+  if (editingTabId == null) return;
+  const tab = tabs.find(t => t.id === editingTabId);
+  if (!tab) return;
+  const name = document.getElementById('edit-tab-name').value.trim();
+  const hosts = document.getElementById('edit-tab-hosts').value
     .split('\n').map(h => h.trim()).filter(h => h);
   if (!name) { alert('Tab name is required'); return; }
-  g.name = name;
-  g.hosts = hosts;
-  saveGroups();
+  tab.name = name;
+  tab.hosts = hosts;
+  saveTabs();
   renderTabs();
-  if (activeGroupId === g.id) fetchAll();
-  closeGroupEdit();
+  if (activeTabId === tab.id) fetchAll();
+  closeTabEdit();
 }
 
-function deleteGroupFromEdit() {
-  if (editingGroupId == null) return;
+function deleteTabFromEdit() {
+  if (editingTabId == null) return;
   if (!confirm('Delete this tab?')) return;
-  groups = groups.filter(g => g.id !== editingGroupId);
-  saveGroups();
-  if (activeGroupId === editingGroupId) { activeGroupId = 0; currentPage = 1; }
+  tabs = tabs.filter(tab => tab.id !== editingTabId);
+  saveTabs();
+  if (activeTabId === editingTabId) { activeTabId = 0; currentPage = 1; }
   renderTabs();
   fetchAll();
-  closeGroupEdit();
+  closeTabEdit();
 }
 
-function openGroupModal() {
-  closeGroupEdit();
-  renderGroupList();
-  document.getElementById('group-modal').classList.add('open');
+function openTabModal() {
+  closeTabEdit();
+  renderTabList();
+  document.getElementById('tab-modal').classList.add('open');
 }
 
-function closeGroupModal() {
-  document.getElementById('group-modal').classList.remove('open');
-  closeGroupEdit();
+function closeTabModal() {
+  document.getElementById('tab-modal').classList.remove('open');
+  closeTabEdit();
 }
 
-function addGroup() {
-  const name = document.getElementById('new-group-name').value.trim();
-  const hostsText = document.getElementById('new-group-hosts').value.trim();
+function addTab() {
+  const name = document.getElementById('new-tab-name').value.trim();
+  const hostsText = document.getElementById('new-tab-hosts').value.trim();
   if (!name || !hostsText) return;
   const hosts = hostsText.split('\n').map(h => h.trim()).filter(h => h);
-  groups.push({ id: Date.now(), name, hosts });
-  saveGroups();
-  document.getElementById('new-group-name').value = '';
-  document.getElementById('new-group-hosts').value = '';
-  renderGroupList();
+  tabs.push({ id: Date.now(), name, hosts });
+  saveTabs();
+  currentPage = 1;
+  document.getElementById('new-tab-name').value = '';
+  document.getElementById('new-tab-hosts').value = '';
+  renderTabList();
   renderTabs();
+  fetchAll();
 }
 
-function saveGroups() {
-  localStorage.setItem('aerolog_groups', JSON.stringify(groups));
+function saveTabs() {
+  const serialized = JSON.stringify(tabs);
+  localStorage.setItem('aerolog_tabs', serialized);
 }
 
 // ---- Aliases modal ----
@@ -1583,7 +1591,7 @@ function renderQueryList() {
     return;
   }
   list.innerHTML = savedQueries.map(q => `
-    <div class="group-list-item" onclick="openQueryEdit(${q.id})">
+    <div class="list-item" onclick="openQueryEdit(${q.id})">
       <span><b>${escapeHtml(q.name)}</b> <span style="color: var(--text-dim);"><code>${escapeHtml(q.query)}</code></span></span>
       <span class="edit-icon">view</span>
     </div>
@@ -1701,7 +1709,7 @@ function exportConfig() {
     poll_interval: savedPollInterval,
     time_range: savedTimeRange,
     aliases: hostnameAliases,
-    tabs: groups,
+    tabs: tabs,
     queries: savedQueries,
     columns: { widths: exportedWidths },
   };
@@ -1749,8 +1757,8 @@ function importConfig(event) {
         rebuildAliasReverse();
       }
       if (Array.isArray(config.tabs)) {
-        groups = config.tabs;
-        saveGroups();
+        tabs = config.tabs;
+        saveTabs();
       }
       if (Array.isArray(config.queries)) {
         savedQueries = config.queries;
@@ -1767,9 +1775,8 @@ function importConfig(event) {
       }
       renderTabs();
       renderHeader();
-      applyPolling();
       currentPage = 1;
-      fetchAll();
+      applyPolling();
       alert('Config imported successfully');
     } catch (err) {
       alert('Failed to parse config file: ' + err.message);
@@ -1781,12 +1788,12 @@ function importConfig(event) {
 
 function resetConfig() {
   if (!confirm('Reset all settings? This clears server URL, theme, page size, polling, time range, aliases, tabs, queries, and columns.')) return;
-  ['aerolog_server','aerolog_groups','aerolog_theme','aerolog_page_size',
+  ['aerolog_server','aerolog_tabs','aerolog_theme','aerolog_page_size',
    'aerolog_poll_interval','aerolog_time_range','aerolog_aliases','aerolog_columns','aerolog_queries'
   ].forEach(k => localStorage.removeItem(k));
   serverUrl = DEFAULT_SERVER;
-  groups = [];
-  activeGroupId = 0;
+  tabs = [];
+  activeTabId = 0;
   pageSize = DEFAULT_PAGE_SIZE;
   savedPollInterval = DEFAULT_POLL;
   savedTimeRange = DEFAULT_TIME_RANGE;
@@ -1805,7 +1812,6 @@ function resetConfig() {
   renderHeader();
   applyPolling();
   closeSettingsModal();
-  fetchAll();
 }
 
 // ---- Polling & progress bar ----
@@ -1816,16 +1822,14 @@ function stopPolling() {
 
 function applyPolling() {
   stopPolling();
-  const val = document.getElementById('poll-interval').value;
+  const val = getPollValue();
   const bar = document.getElementById('conn-progress');
-  // Always fetch once when polling is reconfigured. If on, the interval handles the rest.
+  if (bar) bar.style.display = val === 'off' ? 'none' : '';
+  updateConnStatus('paused');
   fetchAll();
   if (val === 'off') {
-    if (bar) bar.style.display = 'none';
-    updateConnStatus('paused');
     return;
   }
-  if (bar) bar.style.display = '';
   const ms = parseInt(val, 10) * 1000;
   pollTimer = setInterval(() => {
     if (currentPage === 1) fetchAll();
@@ -1860,10 +1864,9 @@ function resetProgressBar() {
 }
 
 function onPollIntervalChange() {
-  const val = document.getElementById('poll-interval').value;
+  const val = getPollValue();
   if (val !== 'off' && currentPage !== 1) {
     currentPage = 1;
-    fetchAll();
   }
   savedPollInterval = val;
   localStorage.setItem('aerolog_poll_interval', savedPollInterval);
@@ -1897,9 +1900,9 @@ document.getElementById('search').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
 });
 
-// Modal registry: id -> close function. Used by Escape, overlay click, and Enter handler.
+// Modal registry: id -> close function. Used by Escape and overlay click.
 const MODALS = {
-  'group-modal':    closeGroupModal,
+  'tab-modal':      closeTabModal,
   'settings-modal': closeSettingsModal,
   'aliases-modal': closeAliasesModal,
   'queries-modal': closeQueriesModal,
@@ -1916,35 +1919,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     for (const close of Object.values(MODALS)) close();
   }
-  if (e.key === 'Enter') {
-    // Textareas keep newline behavior
-    if (e.target.tagName === 'TEXTAREA') return;
-    // Find the topmost open modal and trigger its save action
-    if (isOpen('queries-modal')) {
-      e.preventDefault();
-      if (isShown('query-edit-view')) {
-        saveQueryEdit();
-      } else {
-        const name = document.getElementById('new-query-name').value.trim();
-        const query = document.getElementById('new-query-text').value.trim();
-        if (name && query) addQuery(); else closeQueriesModal();
-      }
-    } else if (isOpen('aliases-modal')) {
-      e.preventDefault();
-      saveAliases();
-    } else if (isOpen('group-modal')) {
-      e.preventDefault();
-      if (isShown('group-edit-view')) saveGroupEdit();
-      else closeGroupModal();
-    } else if (isOpen('settings-modal')) {
-      e.preventDefault();
-      saveAllSettings();
-    }
-  }
 });
 
-function isOpen(id)  { return document.getElementById(id).classList.contains('open'); }
-function isShown(id) { const el = document.getElementById(id); return el && el.style.display !== 'none'; }
 
 // ---- Init ----
 document.getElementById('version-text').textContent = VERSION;
