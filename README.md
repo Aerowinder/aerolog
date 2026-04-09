@@ -4,26 +4,20 @@ Aerolog is single-file HTML frontend for VictoriaLogs. It is essentially VMUI wi
 
 This project is vibe coded. The heavy lifting is done by LLMs with my oversight and extensive testing.
 
-## What it does
+## What is Aerolog?
+Aerolog collects logs from an instance of VictoriaLogs, and displays them in a better looking and more functional way than VMUI offers. It also has a few big features that VMUI is missing.
 
-- Collect logs from a VictoriaLogs server with configurable polling intervals
-- Filter by hostname tabs you define yourself
-- Search using LogsQL with friendly shortcuts like `host:`, `app:`, `severity:`
-- Map ugly hostnames or IPs to friendly names with aliases
-- Severity and facility columns auto-extracted from syslog priority
-- Resizable columns, persisted across reloads
-- Light, dark, and system themes
-- Pagination with proper page numbers, not just next/prev
-- Connection status pill with response time and a poll-countdown bar
-- Mobile responsive (kind of, see notes below)
-- Backup and restore your config as JSON
+## What features separate Aerolog from VictoriaLogs VMUI?
+- Arrange hostnames in custom tabs, to view like-messages together without queries. You define the name of the tab, and which hosts report in that tab.
+- Map ugly hostnames or IPs to friendly names with aliases. If your UPS is returning the hostname `UPS(192.168.1.18)`, you can use aliases to rename it to `ups-01`, or whatever you'd like. Aliased hostnames are searchable.
+- Save complex queries for easier searching at a later time.
+- Backup and restore your config as JSON file. Since Aerolog uses localStorage, every system will need a copy of the JSON settings. Default settings are sane, but won't have your Tabs, Aliases, or Queries.
 
-## What it does not do
-
-- It does not ingest logs. You need rsyslog, syslog-ng, vector, fluentd, or whatever you already use to get logs into VictoriaLogs. Aerolog only reads them.
-- It does not do alerting. Use vmalert or whatever else you like.
-- It does not do auth. Put it behind nginx basic auth, vmauth, a VPN, or something else. The dashboard talks directly to VictoriaLogs over HTTP, so secure that link however you secure your other internal tooling.
-- It does not have a backend. Everything lives in the browser. Settings persist to localStorage. There is no server-side state.
+## What Aerolog is not
+- Does not ingest logs. You need rsyslog, syslog-ng, vector, fluentd, or whatever you already use to get logs into VictoriaLogs. Aerolog only reads them.
+- Does not do alerting. Use vmalert or whatever else you like.
+- Does not do auth. Put it behind nginx basic auth, vmauth, a VPN, or something else. The dashboard talks directly to VictoriaLogs over HTTP, so secure that link however you secure your other internal tooling.
+- Does not have a backend. Everything lives in the browser. Settings persist to localStorage. There is no server-side state.
 
 ## Setup
 Once you have VictoriaLogs running, just use the in-browser configuration setup of Aerolog to point it at your VictoriaLogs instance.
@@ -52,6 +46,10 @@ super-long-host-name = shortname
 ```
 
 Aliases apply everywhere: the displayed hostname column, tab definitions, and search queries. So `host:router-01` will find logs from `10.0.0.5`.
+
+### Queries
+
+Click "Tabs" in the tab strip to manage your saved queries.
 
 ## Search syntax
 

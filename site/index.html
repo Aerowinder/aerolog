@@ -335,6 +335,7 @@
   .log-wrap { overflow: auto; }
   .log-table {
     width: 100%;
+    min-width: 1700px;
     border-collapse: collapse;
     font-family: var(--mono);
     font-size: 1rem;
@@ -466,7 +467,7 @@
     flex-wrap: wrap;
   }
   .pager-info { font-family: var(--mono); font-size: 1rem; }
-  .pager-buttons { display: flex; gap: 0.3rem; }
+  .pager-buttons { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: flex-end; }
   .pager-btn {
     font-family: var(--mono);
     font-size: 1rem;
@@ -803,6 +804,39 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="queries-modal">
+  <div class="modal">
+    <h3 id="query-modal-title">Saved Queries</h3>
+
+    <div id="query-list-view">
+      <div id="query-list"></div>
+      <hr class="sep">
+      <h4>Add New Query</h4>
+      <label>Query name</label>
+      <input type="text" id="new-query-name" placeholder="e.g. SSH failures">
+      <label>LogsQL query</label>
+      <input type="text" id="new-query-text" placeholder="e.g. app:sshd error">
+      <div class="modal-actions">
+        <button class="btn" onclick="closeQueriesModal()">Close</button>
+        <button class="btn btn-primary" onclick="addQuery()">Add Query</button>
+      </div>
+    </div>
+
+    <div id="query-edit-view" style="display: none;">
+      <label>Query name</label>
+      <input type="text" id="edit-query-name">
+      <label>LogsQL query</label>
+      <input type="text" id="edit-query-text">
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="loadQueryFromEdit()" style="margin-right: auto;">Load</button>
+        <button class="btn" onclick="closeQueryEdit()">Back</button>
+        <button class="btn btn-danger" onclick="deleteQueryFromEdit()">Delete</button>
+        <button class="btn btn-primary" onclick="saveQueryEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">copied</div>
 
 <script>
@@ -810,28 +844,41 @@
 // Aerolog - VictoriaLogs frontend
 // =============================================================================
 
-const VERSION = '2026.04.08a';
+const VERSION = '2026.04.09a';
 const DEFAULT_SERVER = 'http://localhost:9428';
-const PAGE_BUTTONS = 6;
 const DEFAULT_PAGE_SIZE = '100';
 const DEFAULT_POLL = '5';
+const DEFAULT_TIME_RANGE = '1h';
+const PAGE_BUTTONS = 6;
 
-// Column definitions
+// Column definitions. `width` is the default px width; the message column is fluid (null).
+// `exportKey` is the friendly name used in exported config JSON.
 const COLUMN_DEFS = {
-  '_time':    { label: 'Timestamp', width: 220, render: renderTimestamp,  className: 'ts'   },
-  'hostname': { label: 'Hostname',  width: 200, render: renderHostname,   className: 'host' },
-  'priority': { label: 'Severity',  width: 130, render: renderPriority,   className: ''     },
-  'facility': { label: 'Facility',  width: 120, render: renderFacility,   className: 'app'  },
-  'app_name': { label: 'App',       width: 180, render: renderAppName,    className: 'app'  },
-  '_msg':     { label: 'Message',   width: null, render: renderMessage,   className: 'msg'  },
+  '_time':    { label: 'Timestamp', width: 220,  exportKey: 'time',     render: renderTimestamp, className: 'ts'   },
+  'hostname': { label: 'Hostname',  width: 200,  exportKey: 'hostname', render: renderHostname,  className: 'host' },
+  'priority': { label: 'Severity',  width: 130,  exportKey: 'severity', render: renderPriority,  className: ''     },
+  'facility': { label: 'Facility',  width: 120,  exportKey: 'facility', render: renderFacility,  className: 'app'  },
+  'app_name': { label: 'App',       width: 180,  exportKey: 'app',      render: renderAppName,   className: 'app'  },
+  '_msg':     { label: 'Message',   width: null, exportKey: null,       render: renderMessage,   className: 'msg'  },
 };
 
-// Fixed column order - no longer reorderable or hideable
-const COLUMN_ORDER = ['_time', 'hostname', 'priority', 'facility', 'app_name', '_msg'];
+// Fixed column order. No reorder, no hide.
+const COLUMN_ORDER = Object.keys(COLUMN_DEFS);
 
+// Default layout derived from COLUMN_DEFS so width defaults live in one place.
 const DEFAULT_COLUMN_LAYOUT = {
-  widths: { '_time': 220, 'hostname': 200, 'priority': 130, 'facility': 120, 'app_name': 180 },
+  widths: Object.fromEntries(
+    Object.entries(COLUMN_DEFS).filter(([, d]) => d.width != null).map(([id, d]) => [id, d.width])
+  ),
 };
+
+// Translation maps for column id <-> exported key, both derived from COLUMN_DEFS.
+const COL_ID_TO_KEY = Object.fromEntries(
+  Object.entries(COLUMN_DEFS).filter(([, d]) => d.exportKey).map(([id, d]) => [id, d.exportKey])
+);
+const COL_KEY_TO_ID = Object.fromEntries(
+  Object.entries(COL_ID_TO_KEY).map(([id, key]) => [key, id])
+);
 
 // Severity lookups (0-7 from VictoriaLogs' severity field)
 const SEVERITY_SHORT = {0:'emerg',1:'alert',2:'crit',3:'err',4:'warn',5:'notice',6:'info',7:'debug'};
@@ -843,8 +890,9 @@ let serverUrl = localStorage.getItem('aerolog_server') || DEFAULT_SERVER;
 let currentTheme = localStorage.getItem('aerolog_theme') || 'dark';
 let pageSize = localStorage.getItem('aerolog_page_size') || DEFAULT_PAGE_SIZE;
 let savedPollInterval = localStorage.getItem('aerolog_poll_interval') || DEFAULT_POLL;
-let savedTimeRange = localStorage.getItem('aerolog_time_range') || '1h';
+let savedTimeRange = localStorage.getItem('aerolog_time_range') || DEFAULT_TIME_RANGE;
 let hostnameAliases = JSON.parse(localStorage.getItem('aerolog_aliases') || '{}');
+let savedQueries = JSON.parse(localStorage.getItem('aerolog_queries') || '[]');
 let columnLayout = JSON.parse(localStorage.getItem('aerolog_columns') || 'null') || structuredClone(DEFAULT_COLUMN_LAYOUT);
 
 // ---- Runtime state ----
@@ -853,6 +901,7 @@ let pollTimer = null;
 let progressTimer = null;
 let progressStart = 0;
 let editingGroupId = null;
+let editingQueryId = null;
 let currentPage = 1;
 let totalPages = 1;
 let totalCount = 0;
@@ -861,9 +910,9 @@ let aliasReverse = {};
 // Snapshot of committed search query - what poller actually uses
 let committedSearch = '';
 
-// Poll lifecycle state
+// Poll lifecycle state.
 // pollSeq increments per poll. lastPollSettledSeq tracks which polls have completed
-// (success or fail). A deadline timer fires after the polling interval — if the latest
+// (success or fail). A deadline timer fires after the polling interval; if the latest
 // poll still hasn't settled by then, we consider it timed out and mark it failed.
 let pollSeq = 0;
 let lastPollSettledSeq = 0;
@@ -1040,10 +1089,8 @@ function buildPagedQuery(page) {
   const filter = buildFilterClause();
   const size = parseInt(pageSize, 10);
   const offset = (page - 1) * size;
-  if (offset > 0) {
-    return filter + ` | sort by (_time) desc | offset ${offset} | limit ${size}`;
-  }
-  return filter + ` | sort by (_time) desc | limit ${size}`;
+  const offsetClause = offset > 0 ? ` | offset ${offset}` : '';
+  return `${filter} | sort by (_time) desc${offsetClause} | limit ${size}`;
 }
 
 function buildCountQuery() {
@@ -1198,18 +1245,12 @@ function renderFacility(log) {
 // ---- Rendering ----
 function renderHeader() {
   const thead = document.getElementById('log-thead');
-
-  let html = '';
-  for (const colId of COLUMN_ORDER) {
+  thead.innerHTML = COLUMN_ORDER.map(colId => {
     const def = COLUMN_DEFS[colId];
-    if (!def) continue;
     const w = columnLayout.widths[colId];
     const widthStyle = w ? `style="width: ${w}px;"` : '';
-    html += `<th data-col-id="${colId}" ${widthStyle}>${def.label}</th>`;
-  }
-
-  thead.innerHTML = html;
-
+    return `<th data-col-id="${colId}" ${widthStyle}>${def.label}</th>`;
+  }).join('');
   setupHeaderInteractions();
 }
 
@@ -1254,28 +1295,22 @@ function saveColumnLayout() {
 
 function renderLogs(logs) {
   const tbody = document.getElementById('log-body');
-  const colCount = COLUMN_ORDER.length;
-
   if (!logs.length) {
-    tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty">No logs found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${COLUMN_ORDER.length}" class="empty">No logs found</td></tr>`;
     return;
   }
 
   tbody.innerHTML = logs.map((log, i) => {
-    let row = `<tr data-idx="${i}">`;
-    for (const colId of COLUMN_ORDER) {
+    const cells = COLUMN_ORDER.map(colId => {
       const def = COLUMN_DEFS[colId];
-      if (!def) continue;
       const cls = def.className ? ` class="${def.className}"` : '';
-      // The message column gets a relatively-positioned wrapper plus the copy button
-      if (colId === '_msg') {
-        row += `<td${cls}>${def.render(log)}<button class="copy-btn" onclick="copyRow(${i})" title="Copy row">⎘</button></td>`;
-      } else {
-        row += `<td${cls}>${def.render(log)}</td>`;
-      }
-    }
-    row += '</tr>';
-    return row;
+      // The message column gets an overlaid copy button
+      const copyBtn = colId === '_msg'
+        ? `<button class="copy-btn" onclick="copyRow(${i})" title="Copy row">⎘</button>`
+        : '';
+      return `<td${cls}>${def.render(log)}${copyBtn}</td>`;
+    }).join('');
+    return `<tr data-idx="${i}">${cells}</tr>`;
   }).join('');
 }
 
@@ -1381,6 +1416,11 @@ function goPage(p) {
     stopPolling();
   }
   fetchAll().then(() => {
+    // After paginating off page 1, force the dot to gray (paused) since
+    // fetchAll's success path will have set it to green.
+    if (currentPage !== 1) {
+      updateConnStatus('paused');
+    }
     // After the new page renders, scroll the pagination bar into view
     const pager = document.querySelector('.pagination');
     if (pager) pager.scrollIntoView({ block: 'end', behavior: 'instant' });
@@ -1397,6 +1437,7 @@ function renderTabs() {
   html += `<div class="tab-sep"></div>`;
   html += `<button class="tab tab-mgmt" onclick="openGroupModal()">Tabs</button>`;
   html += `<button class="tab tab-mgmt" onclick="openAliasesModal()">Aliases</button>`;
+  html += `<button class="tab tab-mgmt" onclick="openQueriesModal()">Queries</button>`;
   tabs.innerHTML = html;
 }
 
@@ -1417,7 +1458,7 @@ function renderGroupList() {
   list.innerHTML = groups.map(g => `
     <div class="group-list-item" onclick="openGroupEdit(${g.id})">
       <span><b>${escapeHtml(g.name)}</b> <span style="color: var(--text-dim);">(${g.hosts.length} host${g.hosts.length === 1 ? '' : 's'})</span></span>
-      <span class="edit-icon">edit ›</span>
+      <span class="edit-icon">view</span>
     </div>
   `).join('');
 }
@@ -1515,6 +1556,103 @@ function saveAliases() {
   fetchAll();
 }
 
+// ---- Saved Queries modal ----
+function openQueriesModal() {
+  editingQueryId = null;
+  document.getElementById('query-modal-title').textContent = 'Saved Queries';
+  document.getElementById('query-list-view').style.display = 'block';
+  document.getElementById('query-edit-view').style.display = 'none';
+  document.getElementById('new-query-name').value = '';
+  document.getElementById('new-query-text').value = '';
+  renderQueryList();
+  document.getElementById('queries-modal').classList.add('open');
+}
+
+function closeQueriesModal() {
+  document.getElementById('queries-modal').classList.remove('open');
+}
+
+function saveQueries() {
+  localStorage.setItem('aerolog_queries', JSON.stringify(savedQueries));
+}
+
+function renderQueryList() {
+  const list = document.getElementById('query-list');
+  if (!savedQueries.length) {
+    list.innerHTML = '<p class="hint" style="margin: 0 0 0.5rem 0;">No saved queries yet. Add one below.</p>';
+    return;
+  }
+  list.innerHTML = savedQueries.map(q => `
+    <div class="group-list-item" onclick="openQueryEdit(${q.id})">
+      <span><b>${escapeHtml(q.name)}</b> <span style="color: var(--text-dim);"><code>${escapeHtml(q.query)}</code></span></span>
+      <span class="edit-icon">view</span>
+    </div>
+  `).join('');
+}
+
+function openQueryEdit(id) {
+  const q = savedQueries.find(q => q.id === id);
+  if (!q) return;
+  editingQueryId = id;
+  document.getElementById('edit-query-name').value = q.name;
+  document.getElementById('edit-query-text').value = q.query;
+  document.getElementById('query-modal-title').textContent = `Edit: ${q.name}`;
+  document.getElementById('query-list-view').style.display = 'none';
+  document.getElementById('query-edit-view').style.display = 'block';
+}
+
+function closeQueryEdit() {
+  editingQueryId = null;
+  document.getElementById('query-modal-title').textContent = 'Saved Queries';
+  document.getElementById('query-list-view').style.display = 'block';
+  document.getElementById('query-edit-view').style.display = 'none';
+  renderQueryList();
+}
+
+function saveQueryEdit() {
+  if (editingQueryId == null) return;
+  const q = savedQueries.find(q => q.id === editingQueryId);
+  if (!q) return;
+  const name = document.getElementById('edit-query-name').value.trim();
+  const query = document.getElementById('edit-query-text').value.trim();
+  if (!name) { alert('Query name is required'); return; }
+  if (!query) { alert('Query text is required'); return; }
+  q.name = name;
+  q.query = query;
+  saveQueries();
+  closeQueryEdit();
+}
+
+function deleteQueryFromEdit() {
+  if (editingQueryId == null) return;
+  if (!confirm('Delete this saved query?')) return;
+  savedQueries = savedQueries.filter(q => q.id !== editingQueryId);
+  saveQueries();
+  closeQueryEdit();
+}
+
+function loadQueryFromEdit() {
+  if (editingQueryId == null) return;
+  const q = savedQueries.find(q => q.id === editingQueryId);
+  if (!q) return;
+  closeQueriesModal();
+  document.getElementById('search').value = q.query;
+  committedSearch = q.query;
+  currentPage = 1;
+  fetchAll();
+}
+
+function addQuery() {
+  const name = document.getElementById('new-query-name').value.trim();
+  const query = document.getElementById('new-query-text').value.trim();
+  if (!name || !query) return;
+  savedQueries.push({ id: Date.now(), name, query });
+  saveQueries();
+  document.getElementById('new-query-name').value = '';
+  document.getElementById('new-query-text').value = '';
+  renderQueryList();
+}
+
 // ---- Settings modal ----
 function openSettingsModal() {
   document.getElementById('server-url').value = serverUrl;
@@ -1548,17 +1686,24 @@ function saveAllSettings() {
 }
 
 function exportConfig() {
+  const exportedWidths = {};
+  for (const [id, w] of Object.entries(columnLayout.widths || {})) {
+    const k = COL_ID_TO_KEY[id];
+    if (k) exportedWidths[k] = w;
+  }
   const config = {
-    version: 5,
-    exported_at: new Date().toISOString(),
+    settings_version: 1,
+    aerolog_version: VERSION,
+    export_time: new Date().toISOString(),
     server: serverUrl,
     theme: currentTheme,
-    page_size: pageSize,
+    row_count: pageSize,
     poll_interval: savedPollInterval,
     time_range: savedTimeRange,
     aliases: hostnameAliases,
-    groups: groups,
-    columns: columnLayout,
+    tabs: groups,
+    queries: savedQueries,
+    columns: { widths: exportedWidths },
   };
   const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1583,8 +1728,8 @@ function importConfig(event) {
       if (typeof config.theme === 'string' && ['light','dark','system'].includes(config.theme)) {
         setTheme(config.theme);
       }
-      if (config.page_size != null) {
-        pageSize = String(config.page_size);
+      if (config.row_count != null) {
+        pageSize = String(config.row_count);
         localStorage.setItem('aerolog_page_size', pageSize);
         document.getElementById('page-size').value = pageSize;
       }
@@ -1603,12 +1748,21 @@ function importConfig(event) {
         localStorage.setItem('aerolog_aliases', JSON.stringify(hostnameAliases));
         rebuildAliasReverse();
       }
-      if (Array.isArray(config.groups)) {
-        groups = config.groups;
+      if (Array.isArray(config.tabs)) {
+        groups = config.tabs;
         saveGroups();
       }
-      if (config.columns && typeof config.columns === 'object') {
-        columnLayout = config.columns;
+      if (Array.isArray(config.queries)) {
+        savedQueries = config.queries;
+        saveQueries();
+      }
+      if (config.columns && typeof config.columns === 'object' && config.columns.widths) {
+        const widths = {};
+        for (const [k, w] of Object.entries(config.columns.widths)) {
+          const id = COL_KEY_TO_ID[k];
+          if (id) widths[id] = w;
+        }
+        columnLayout = { widths };
         saveColumnLayout();
       }
       renderTabs();
@@ -1626,17 +1780,18 @@ function importConfig(event) {
 }
 
 function resetConfig() {
-  if (!confirm('Reset all settings? This clears server URL, theme, page size, polling, time range, aliases, tabs, and columns.')) return;
+  if (!confirm('Reset all settings? This clears server URL, theme, page size, polling, time range, aliases, tabs, queries, and columns.')) return;
   ['aerolog_server','aerolog_groups','aerolog_theme','aerolog_page_size',
-   'aerolog_poll_interval','aerolog_time_range','aerolog_aliases','aerolog_columns'
+   'aerolog_poll_interval','aerolog_time_range','aerolog_aliases','aerolog_columns','aerolog_queries'
   ].forEach(k => localStorage.removeItem(k));
   serverUrl = DEFAULT_SERVER;
   groups = [];
   activeGroupId = 0;
   pageSize = DEFAULT_PAGE_SIZE;
   savedPollInterval = DEFAULT_POLL;
-  savedTimeRange = '1h';
+  savedTimeRange = DEFAULT_TIME_RANGE;
   hostnameAliases = {};
+  savedQueries = [];
   columnLayout = structuredClone(DEFAULT_COLUMN_LAYOUT);
   committedSearch = '';
   rebuildAliasReverse();
@@ -1663,6 +1818,8 @@ function applyPolling() {
   stopPolling();
   const val = document.getElementById('poll-interval').value;
   const bar = document.getElementById('conn-progress');
+  // Always fetch once when polling is reconfigured. If on, the interval handles the rest.
+  fetchAll();
   if (val === 'off') {
     if (bar) bar.style.display = 'none';
     updateConnStatus('paused');
@@ -1670,8 +1827,6 @@ function applyPolling() {
   }
   if (bar) bar.style.display = '';
   const ms = parseInt(val, 10) * 1000;
-  // Fire one poll immediately so the bar and the first response are aligned
-  fetchAll();
   pollTimer = setInterval(() => {
     if (currentPage === 1) fetchAll();
   }, ms);
@@ -1742,23 +1897,54 @@ document.getElementById('search').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
 });
 
+// Modal registry: id -> close function. Used by Escape, overlay click, and Enter handler.
+const MODALS = {
+  'group-modal':    closeGroupModal,
+  'settings-modal': closeSettingsModal,
+  'aliases-modal': closeAliasesModal,
+  'queries-modal': closeQueriesModal,
+};
+
+// Close all modals on Escape; close individually on overlay click.
+for (const id of Object.keys(MODALS)) {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target.id === id) MODALS[id]();
+  });
+}
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    closeGroupModal();
-    closeSettingsModal();
-    closeAliasesModal();
+    for (const close of Object.values(MODALS)) close();
+  }
+  if (e.key === 'Enter') {
+    // Textareas keep newline behavior
+    if (e.target.tagName === 'TEXTAREA') return;
+    // Find the topmost open modal and trigger its save action
+    if (isOpen('queries-modal')) {
+      e.preventDefault();
+      if (isShown('query-edit-view')) {
+        saveQueryEdit();
+      } else {
+        const name = document.getElementById('new-query-name').value.trim();
+        const query = document.getElementById('new-query-text').value.trim();
+        if (name && query) addQuery(); else closeQueriesModal();
+      }
+    } else if (isOpen('aliases-modal')) {
+      e.preventDefault();
+      saveAliases();
+    } else if (isOpen('group-modal')) {
+      e.preventDefault();
+      if (isShown('group-edit-view')) saveGroupEdit();
+      else closeGroupModal();
+    } else if (isOpen('settings-modal')) {
+      e.preventDefault();
+      saveAllSettings();
+    }
   }
 });
 
-document.getElementById('group-modal').addEventListener('click', e => {
-  if (e.target.id === 'group-modal') closeGroupModal();
-});
-document.getElementById('settings-modal').addEventListener('click', e => {
-  if (e.target.id === 'settings-modal') closeSettingsModal();
-});
-document.getElementById('aliases-modal').addEventListener('click', e => {
-  if (e.target.id === 'aliases-modal') closeAliasesModal();
-});
+function isOpen(id)  { return document.getElementById(id).classList.contains('open'); }
+function isShown(id) { const el = document.getElementById(id); return el && el.style.display !== 'none'; }
 
 // ---- Init ----
 document.getElementById('version-text').textContent = VERSION;
@@ -1768,9 +1954,6 @@ document.getElementById('time-range').value = savedTimeRange;
 renderHeader();
 renderTabs();
 updateConnStatus('paused');
-// Always fetch once on load. If polling is on, applyPolling will also fetch - that's fine,
-// the second one will be deduped by the stale-response guard.
-if (savedPollInterval === 'off') fetchAll();
 applyPolling();
 </script>
 
