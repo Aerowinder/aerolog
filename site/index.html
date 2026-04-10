@@ -101,13 +101,26 @@
 <!-- Settings modal -->
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
-    <h3>Settings</h3>
+    <div class="modal-header-row">
+      <h3>Settings</h3>
+      <a class="modal-header-link" href="https://github.com/aerowinder/aerolog" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </div>
+
+    <h4>Config Management</h4>
+    <div class="btn-row">
+      <button class="btn" data-action="trigger-import">Import</button>
+      <button class="btn" data-action="export-config">Export</button>
+      <button class="btn btn-danger" data-action="reset-config">Reset All</button>
+    </div>
+    <input type="file" id="import-file" accept="application/json" style="display: none;">
+
+    <hr class="sep">
 
     <h4>Theme</h4>
     <div class="theme-row">
-      <button class="theme-btn" data-theme-val="light">Light</button>
-      <button class="theme-btn" data-theme-val="dark">Dark</button>
-      <button class="theme-btn" data-theme-val="system">System</button>
+      <button class="theme-btn btn" data-theme-val="light" type="button">Light</button>
+      <button class="theme-btn btn" data-theme-val="dark" type="button">Dark</button>
+      <button class="theme-btn btn" data-theme-val="system" type="button">System</button>
     </div>
 
     <hr class="sep">
@@ -116,17 +129,6 @@
     <label>Server URL</label>
     <input type="text" id="server-url" placeholder="localhost:9428">
     <p class="hint">VictoriaLogs server (no trailing slash). Defaults to localhost:9428. If you omit http:// or https://, Aerolog assumes https:// internally.</p>
-
-    <hr class="sep">
-
-    <h4>Config Backup / Restore</h4>
-    <p class="hint" style="margin-top: 0;">Exports all settings (server, theme, page size, polling, aliases, tabs, columns) to a JSON file.</p>
-    <div class="btn-row">
-      <button class="btn" data-action="export-config">Export</button>
-      <button class="btn" data-action="trigger-import">Import</button>
-      <button class="btn btn-danger" data-action="reset-config">Reset All</button>
-    </div>
-    <input type="file" id="import-file" accept="application/json" style="display: none;">
 
     <div class="modal-actions">
       <button class="btn" data-action="close-settings">Close</button>

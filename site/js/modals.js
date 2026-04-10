@@ -19,7 +19,13 @@
   }
 
   async function saveAliases() {
-    App.persist.aliases(App.validators.aliasesText(document.getElementById('aliases-text').value));
+    const aliases = App.validators.aliasesText(document.getElementById('aliases-text').value);
+    const duplicateFriendly = App.validators.duplicateFriendlyAlias(aliases);
+    if (duplicateFriendly) {
+      App.utils.showAlert(`Friendly alias names must be unique. Duplicate: ${duplicateFriendly}`);
+      return;
+    }
+    App.persist.aliases(aliases);
     closeAliasesModal();
     App.render.renderLogs();
     await App.api.dispatchRefresh('manual');
@@ -160,7 +166,11 @@
       if (config.row_count != null) App.persist.pageSize(config.row_count);
       if (config.poll_interval != null) App.persist.pollInterval(config.poll_interval);
       if (config.time_range != null) App.persist.timeRange(config.time_range);
-      if (config.aliases != null) App.persist.aliases(config.aliases);
+      if (config.aliases != null) {
+        const duplicateFriendly = App.validators.duplicateFriendlyAlias(config.aliases);
+        if (duplicateFriendly) throw new Error(`Duplicate friendly alias name: ${duplicateFriendly}`);
+        App.persist.aliases(config.aliases);
+      }
       if (config.tabs != null) App.persist.tabs(config.tabs);
       if (config.queries != null) App.persist.queries(config.queries);
       if (config.columns && config.columns.widths) {

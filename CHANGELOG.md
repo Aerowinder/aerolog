@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026.04.10c
+- Blocked duplicate friendly alias names so one friendly name cannot map to multiple systems.
+- Rearranged the Settings window.
+- Added a GitHub link in the Settings window header.
+- Fixed the poll selector so pagination/runtime pause shows `Poll: Off` without overwriting the saved polling preference.
+- Changed the mobile-layout breakpoint to 800px and stopped forcing the connection pill to full width in mobile layout.
+
 ## 2026.04.10b
 - Reworked the app into a cleaner modular structure for ongoing development.
 - Hardened query rewriting so friendly fields, wildcard handling, and alias-aware host matching behave more consistently.

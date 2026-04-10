@@ -33,8 +33,8 @@ Aerolog is meant to stay lean. Do not turn it into a giant platform.
 
 - App name: **Aerolog**
 - Backend target: **VictoriaLogs**
-- Official stable single-file release: **2026.04.10a**
-- Current modular hardening line: **2026.04.10b**
+- Current published release: **2026.04.10c**
+- Current code line: **2026.04.10c**
 
 Important standing rule:
 - **Do not bump the version unless the user explicitly asks for it.**
@@ -44,7 +44,10 @@ Other standing rules:
 - Include `application` as a friendly rewrite alias for `app_name` unless the user says otherwise.
 - Do not make unrelated UI or behavior changes without permission.
 - The user is regression-sensitive and will absolutely notice when something “helpful” changed that they did not ask for.
-- When delivering artifacts, prefer ZIP packages unless the user explicitly asks for a loose file.
+- When delivering artifacts, always provide a ZIP package unless the user explicitly asks for loose files.
+- By default, ZIP packages should contain only the project/runtime files and proper folder structure.
+- Do **not** include `README.md`, `LLM_HANDOFF.md`, or `CHANGELOG.md` in a ZIP unless the user explicitly asks for those docs to be included.
+- The user may provide `README`, handoff, and changelog files separately when they want those updated.
 
 ---
 
@@ -111,6 +114,17 @@ Typical module responsibilities:
   - app initialization
 
 This structure has been easier to work with than the monolith.
+
+
+## 2026.04.10c notes
+
+This release included a small but user-visible polish pass:
+- blocked duplicate friendly alias names
+- adjusted the Settings modal layout and wording
+- added a GitHub link in the Settings modal header
+- kept the poll preference persisted while showing `Poll: Off` in the toolbar when runtime navigation pause disables effective polling
+- moved the mobile-layout breakpoint to 800px
+- let the connection pill size to its content in mobile layout instead of forcing full width
 
 ---
 

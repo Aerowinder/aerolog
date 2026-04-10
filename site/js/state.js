@@ -80,6 +80,9 @@
       const { config, runtime } = App.state;
       return config.pollInterval !== 'off' && runtime.currentPage === 1 && !runtime.polling.pausedForNavigation;
     },
+    effectivePollInterval() {
+      return App.derive.canAutoPoll() ? App.state.config.pollInterval : 'off';
+    },
     showProgressBar() {
       return App.state.config.pollInterval !== 'off';
     },

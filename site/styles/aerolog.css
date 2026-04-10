@@ -140,7 +140,7 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
   }
   .stats-stack b { color: var(--text-bright); font-weight: 600; }
 
-  @media (max-width: 650px) {
+  @media (max-width: 800px) {
     .header { justify-content: center; }
     .header-left { justify-content: center; flex-basis: 100%; }
     .header-right { justify-content: center; flex-basis: 100%; }
@@ -226,13 +226,14 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
   .conn-status.err .conn-progress { background: var(--accent); }
   .conn-status.paused .conn-progress { background: var(--text-dim); }
 
-  @media (max-width: 650px) {
+  @media (max-width: 800px) {
     .conn-status {
-      display: flex;
-      flex: 0 0 100%;
-      width: 100%;
+      display: inline-flex;
+      flex: 0 1 auto;
+      width: auto;
       max-width: 100%;
       justify-content: center;
+      align-self: center;
     }
   }
 
@@ -529,13 +530,28 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     max-height: 90vh;
     overflow-y: auto;
   }
+  .modal-header-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+  }
   .modal h3 {
     font-family: var(--mono);
     font-size: 1.1rem;
-    margin-bottom: 1.1rem;
+    margin-bottom: 0;
     color: var(--text-bright);
     font-weight: 600;
   }
+  .modal-header-link {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .modal-header-link:hover { text-decoration: underline; }
   .modal h4 {
     font-family: var(--mono);
     font-size: 1rem;
@@ -586,17 +602,14 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
   .btn-primary:hover { opacity: 0.88; }
   .btn-danger { color: var(--accent); }
 
-  .theme-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .theme-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
   .theme-btn {
     flex: 1;
-    font-family: var(--mono);
-    font-size: 1rem;
-    padding: 0.7rem;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    color: var(--text);
-    cursor: pointer;
+    text-align: center;
   }
   .theme-btn:hover { border-color: var(--border-hi); }
   .theme-btn.active {
@@ -608,6 +621,7 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
   hr.sep { border: none; border-top: 1px solid var(--border); margin: 1.35rem 0; }
 
   .btn-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .btn-row .btn { flex: 1; text-align: center; }
   .hint {
     font-family: var(--mono);
     font-size: 1rem;

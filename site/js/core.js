@@ -1,7 +1,7 @@
 (function () {
   const App = window.Aerolog = window.Aerolog || {};
 
-  App.VERSION = '2026.04.10b';
+  App.VERSION = '2026.04.10c';
 
   App.DEFAULTS = {
     serverUrl: 'localhost:9428',
@@ -182,6 +182,21 @@
         if (raw && friendly) out[raw] = friendly;
       }
       return out;
+    },
+    duplicateFriendlyAlias(value) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+      const seen = new Map();
+      for (const [raw, friendly] of Object.entries(value)) {
+        const rawKey = String(raw || '').trim();
+        const friendlyValue = String(friendly || '').trim();
+        if (!rawKey || !friendlyValue) continue;
+        const lookup = friendlyValue.toLowerCase();
+        if (seen.has(lookup) && seen.get(lookup) !== rawKey) {
+          return friendlyValue;
+        }
+        seen.set(lookup, rawKey);
+      }
+      return '';
     },
     tabs(value) {
       if (!Array.isArray(value)) return [];

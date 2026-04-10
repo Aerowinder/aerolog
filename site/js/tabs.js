@@ -20,12 +20,13 @@
     if (leavingPageOne) {
       App.polling.pauseForNavigation();
     }
+    App.render.renderToolbarState();
     await App.api.dispatchRefresh('page');
     if (App.state.runtime.currentPage !== 1) {
       App.render.renderConnectionPill();
     }
     const pager = document.querySelector('.pagination');
-    if (pager) pager.scrollIntoView({ block: 'end', behavior: 'instant' });
+    if (pager) pager.scrollIntoView({ block: 'end', behavior: 'auto' });
   }
 
   function openTabModal() {

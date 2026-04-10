@@ -51,7 +51,7 @@
 
   function renderToolbarState() {
     dom.byId('page-size').value = App.state.config.pageSize;
-    dom.byId('poll-interval').value = App.state.config.pollInterval;
+    dom.byId('poll-interval').value = App.derive.effectivePollInterval();
     dom.byId('time-range').value = App.state.config.timeRange;
     dom.byId('search').value = App.state.runtime.committedSearch;
   }

@@ -60,9 +60,10 @@ Click the gear icon in the top-right corner of the page.
 
 ### Settings
 
+- **Config Management**: export your tabs, aliases, queries, columns, and other UI settings to a JSON file you can import elsewhere, or restore them from backup
 - **Theme**: light, dark, or system
 - **Server URL**: where Aerolog connects to VictoriaLogs
-- **Backup / Restore**: export your tabs, aliases, queries, columns, and other UI settings to a JSON file you can import elsewhere
+- **GitHub link**: the Settings modal header includes a direct link to the project page
 
 ### Tabs
 
@@ -112,6 +113,8 @@ Aliases apply in several places:
 - hostname display in the table
 - tab definitions
 - host query rewrites
+
+Friendly alias names must be unique. Aerolog does not allow multiple raw systems to share the same friendly alias.
 
 So `host:router-01` can resolve to the raw device name or IP that actually exists in the logs.
 
@@ -214,6 +217,7 @@ A few behavior notes:
 
 - The configured hostname stays visible in the pill even if polling fails
 - If polling is paused, the indicator goes gray even if the server is offline
+- If pagination or other runtime state pauses effective polling, the Poll control displays `Off` without overwriting the saved poll preference
 - The progress bar remains visible as part of the pill state
 - The next poll is anchored to **when the request is sent**, not when the response returns
 - Manual refresh-causing actions re-anchor the next poll countdown from that send time
