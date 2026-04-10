@@ -641,6 +641,7 @@
     transform: translateX(-50%) translateY(0);
   }
 </style>
+<link rel="icon" type="image/svg+xml" href="./assets/icons/aerolog.svg">
 </head>
 <body>
 
@@ -676,9 +677,9 @@
   <button class="btn-search" onclick="doSearch()">Search</button>
 
   <select class="mini-select" id="poll-interval" onchange="onPollIntervalChange()">
-    <option value="off">Poll: Off</option>
+    <option value="off" selected>Poll: Off</option>
     <option value="1">Poll: 1s</option>
-    <option value="5" selected>Poll: 5s</option>
+    <option value="5">Poll: 5s</option>
     <option value="10">Poll: 10s</option>
     <option value="30">Poll: 30s</option>
     <option value="60">Poll: 1m</option>
@@ -846,10 +847,10 @@
 // Aerolog - VictoriaLogs frontend
 // =============================================================================
 
-const VERSION = '2026.04.09b';
+const VERSION = '2026.04.10a';
 const DEFAULT_SERVER = 'localhost:9428';
 const DEFAULT_PAGE_SIZE = '100';
-const DEFAULT_POLL = '5';
+const DEFAULT_POLL = 'off';
 const DEFAULT_TIME_RANGE = '1h';
 const PAGE_BUTTONS = 6;
 
@@ -988,44 +989,84 @@ function getAliasWildcardMatches(pattern) {
     .map(([raw]) => raw);
 }
 
-function buildHostnameClause(pattern) {
+function buildExactHostnameClause(value) {
+  const exactRaw = aliasReverse[value] || value;
+  return `hostname:="${escapeLogsQlString(exactRaw)}"`;
+}
+
+function buildHostnameClause(pattern, operator = ':') {
   const value = String(pattern || '').trim();
   if (!value) return '';
 
+  if (operator === ':=') {
+    return buildExactHostnameClause(value);
+  }
+
+  if (operator === ':~') {
+    const regexValue = value.startsWith('^') || value.endsWith('$') ? value : wildcardToRegex(value);
+    return `hostname:~"${escapeLogsQlString(regexValue)}"`;
+  }
+
   if (!hasWildcard(value)) {
-    const exactRaw = aliasReverse[value] || value;
-    return `hostname:="${escapeLogsQlString(exactRaw)}"`;
+    return buildExactHostnameClause(value);
   }
 
   const clauses = [`hostname:~"${escapeLogsQlString(wildcardToRegex(value))}"`];
   for (const raw of getAliasWildcardMatches(value)) {
-    const exactClause = `hostname:="${escapeLogsQlString(raw)}"`;
+    const exactClause = buildExactHostnameClause(raw);
     if (!clauses.includes(exactClause)) clauses.push(exactClause);
   }
   return clauses.length === 1 ? clauses[0] : `(${clauses.join(' OR ')})`;
+}
+
+function quoteLogsQlValue(value, wasQuoted) {
+  const stringValue = String(value);
+  const needsQuotes = wasQuoted || /[\s"*]/.test(stringValue) || stringValue === '';
+  return needsQuotes ? `"${stringValue.replace(/"/g, '\"')}"` : stringValue;
+}
+
+function buildFriendlyFieldClause(field, value, operator = ':', wasQuoted = false) {
+  const stringValue = String(value || '').trim();
+  if (!stringValue) return '';
+
+  if (operator === ':=') {
+    return `${field}:=${quoteLogsQlValue(stringValue, true)}`;
+  }
+
+  if (operator === ':~') {
+    return `${field}:~${quoteLogsQlValue(stringValue, true)}`;
+  }
+
+  if (hasWildcard(stringValue)) {
+    return `${field}:~"${escapeLogsQlString(wildcardToRegex(stringValue))}"`;
+  }
+
+  return `${field}:=${quoteLogsQlValue(stringValue, wasQuoted)}`;
 }
 
 // Rewrite friendly query shortcuts to LogsQL field names and normalize hostname filters.
 function rewriteQuery(q) {
   if (!q) return q;
   return q.replace(
-    /(^|[\s(])(app|host|hostname|message|msg|time|timestamp)(\s*:\s*)("([^"]*)"|(\S+))/gi,
-    (match, lead, word, colon, _full, quoted, bare) => {
+    /(^|[\s(])(app_name|app|application|facility_keyword|facility|facility_num|fac|host|hostname|message|msg|_msg|time|timestamp|_time)(\s*:(?:=|~)?\s*)("([^"]*)"|(\S+))/gi,
+    (match, lead, word, operator, _full, quoted, bare) => {
       const wl = word.toLowerCase();
       const fieldMap = {
-        'app': 'app_name', 'host': 'hostname', 'hostname': 'hostname',
-        'message': '_msg', 'msg': '_msg', 'time': '_time', 'timestamp': '_time'
+        'app': 'app_name', 'application': 'app_name', 'app_name': 'app_name',
+        'facility_keyword': 'facility_keyword', 'facility': 'facility_keyword', 'facility_num': 'facility', 'fac': 'facility_keyword',
+        'host': 'hostname', 'hostname': 'hostname',
+        'message': '_msg', 'msg': '_msg', '_msg': '_msg',
+        'time': '_time', 'timestamp': '_time', '_time': '_time'
       };
       const field = fieldMap[wl];
       const value = quoted != null ? quoted : bare;
+      const normalizedOperator = operator.replace(/\s+/g, '');
 
       if (field === 'hostname') {
-        return `${lead}${buildHostnameClause(value)}`;
+        return `${lead}${buildHostnameClause(value, normalizedOperator)}`;
       }
 
-      const needsQuotes = quoted != null || /[\s"]/.test(value);
-      const outVal = needsQuotes ? `"${String(value).replace(/"/g, '\\"')}"` : value;
-      return `${lead}${field}:${outVal}`;
+      return `${lead}${buildFriendlyFieldClause(field, value, normalizedOperator, quoted != null)}`;
     }
   );
 }

@@ -1,12 +1,12 @@
 # Aerolog
 
-Aerolog is a single-file HTML frontend for VictoriaLogs. It takes the core idea of VMUI and adds some quality-of-life features that make day-to-day log browsing less annoying.
+Aerolog is a lightweight HTML frontend for VictoriaLogs. It takes the core idea of VMUI and adds some quality-of-life features that make day-to-day log browsing less annoying.
 
 This project is vibe coded. The heavy lifting is done by LLMs with my oversight and extensive testing.
 
 ## What is Aerolog?
 
-Aerolog talks directly to a VictoriaLogs instance and displays the logs in a cleaner, more workflow-friendly UI. It does not replace VictoriaLogs, and it does not try to become a giant platform. It is a lightweight browser-based log viewer with some extra conveniences layered on top.
+Aerolog talks directly to a VictoriaLogs instance and displays logs in a cleaner, more workflow-friendly UI. It does not replace VictoriaLogs, and it does not try to become a giant platform. It is a browser-based log viewer with a few extra conveniences layered on top.
 
 If VMUI is enough for you, great. If you want tabs, aliases, saved queries, and a UI that is a little less raw, that is where Aerolog fits.
 
@@ -16,11 +16,11 @@ Aerolog is not trying to reinvent logging. The goal is to make common browsing a
 
 Current differentiators include:
 
-- **Tabs for host-based filtering**. Build tabs around groups of devices so you can jump straight to a slice of your environment without retyping queries every time.
-- **Hostname aliases**. Map ugly raw hostnames or IP-based names to something sane and readable.
-- **Alias-aware searching**. Friendly names work in tab definitions and search filters.
-- **Saved queries**. VMUI also supports saved queries, so this is not unique to Aerolog, but Aerolog keeps them in the same local browser config as the rest of its UI state.
-- **Config backup and restore**. Export your local settings to JSON and import them elsewhere.
+- **Tabs for host-based filtering.** Build tabs around groups of devices so you can jump straight to a slice of your environment without retyping queries every time.
+- **Hostname aliases.** Map ugly raw hostnames or IP-based names to something sane and readable.
+- **Alias-aware searching.** Friendly names work in tab definitions and in search filters.
+- **Saved queries.** VMUI also supports saved queries, so this is not unique to Aerolog, but Aerolog keeps them in the same local browser config as the rest of its UI state.
+- **Config backup and restore.** Export your local settings to JSON and import them somewhere else.
 
 ## What Aerolog is not
 
@@ -44,6 +44,8 @@ Examples:
 - `localhost:9428` → treated as `https://localhost:9428`
 - `http://logs-box:9428` → treated as HTTP
 - `https://logs.example.com` → treated as HTTPS
+
+Polling defaults to **Off** in a fresh config.
 
 ## Configuration in the UI
 
@@ -114,16 +116,58 @@ This is handy for ugly filters you do not want to retype, like noisy auth failur
 
 ## Search syntax
 
-Aerolog sends queries through to VictoriaLogs as LogsQL, with a few friendly rewrites on top.
+Aerolog sends queries through to VictoriaLogs as LogsQL, with some friendly rewrites and wildcard sugar layered on top.
 
-| You type                     | Becomes                                 |
-|------------------------------|-----------------------------------------|
-| `error`                      | searches `_msg` for `error`             |
-| `host:router-01`             | `hostname:="10.0.0.5"` (alias resolved) |
-| `app:sshd`                   | `app_name:sshd`                         |
-| `msg:fail` or `message:fail` | `_msg:fail`                             |
-| `severity:<4`                | matches err, crit, alert, emerg         |
-| `severity:3`                 | matches only err                        |
+One important detail: `*` wildcard handling is **Aerolog behavior**, not official LogsQL syntax. Native LogsQL uses exact matching with `:=` and regex matching with `:~`.
+
+### Friendly rewrites
+
+| You type                          | Aerolog targets            |
+|-----------------------------------|----------------------------|
+| `host:` or `hostname:`            | `hostname`                 |
+| `app:` or `application:`          | `app_name`                 |
+| `msg:` or `message:`              | `_msg`                     |
+| `time:` or `timestamp:`           | `_time`                    |
+| `fac:` or `facility:`             | `facility_keyword`         |
+| `facility_num:`                   | `facility`                 |
+
+### Matching behavior
+
+For these friendly rewritten fields:
+
+- No `*` means **exact match**
+- `*` means wildcard matching
+- Explicit operators like `:=` and `:~` are still passed through as exact and regex matches
+
+Examples:
+
+```text
+application:sshd
+application:sshd*
+fac:auth
+fac:*auth
+facility_num:4
+host:router-01
+```
+
+Roughly speaking, those become:
+
+```text
+app_name:="sshd"
+app_name:~"^sshd.*$"
+facility_keyword:="auth"
+facility_keyword:~"^.*auth$"
+facility:="4"
+hostname:="10.0.0.5"
+```
+
+Other conveniences:
+
+| You type         | Behavior                         |
+|------------------|----------------------------------|
+| `error`          | searches `_msg` for `error`      |
+| `severity:<4`    | matches err, crit, alert, emerg  |
+| `severity:3`     | matches only err                 |
 
 Anything valid in LogsQL should still work. Aerolog is helping a little, not inventing a whole replacement query language.
 
@@ -145,7 +189,7 @@ A few behavior notes:
 
 - The configured hostname stays visible in the pill even if polling fails
 - If polling is paused, the indicator goes gray even if the server is offline
-- The progress bar is part of the pill state and remains visible so you can tell the UI is alive and what state it is in
+- The progress bar remains visible as part of the pill state
 
 ## Toolbar settings
 
@@ -180,6 +224,14 @@ Aerolog stores its UI state in the browser using localStorage. That includes thi
 - toolbar preferences
 
 Because of that, a fresh browser or machine will not have your setup unless you import a previously exported config JSON.
+
+## Assets
+
+Aerolog now uses an SVG site icon. Runtime assets can live under `./assets/`, with the favicon currently expected at:
+
+```text
+./assets/icons/aerolog.svg
+```
 
 ## Current design goals
 
