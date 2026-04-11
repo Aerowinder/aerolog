@@ -402,6 +402,8 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     font-size: 1.2rem;
     line-height: 1.2;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    user-select: none;
+    -webkit-user-select: none;
   }
   tr:hover .copy-btn { opacity: 1; }
   .copy-btn:hover {

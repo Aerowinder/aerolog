@@ -15,7 +15,7 @@
   }
 
   function renderMessage(log) {
-    return `<div class="msg-content">${utils.escapeHtml(log._msg || '')}</div>`;
+    return `<span class="msg-content">${utils.escapeHtml(log._msg || '')}</span>`;
   }
 
   function renderPriority(log) {
@@ -42,6 +42,33 @@
     app_name: renderAppName,
     _msg: renderMessage,
   };
+
+  function getCopyValue(columnId, log) {
+    switch (columnId) {
+      case '_time':
+        return utils.formatTime(log._time) || '';
+      case 'hostname':
+        return App.query.displayHostname(log.hostname || '-');
+      case 'priority': {
+        const raw = log.severity;
+        if (raw == null || raw === '') return '-';
+        const num = parseInt(raw, 10);
+        if (Number.isNaN(num)) return String(raw);
+        const label = App.SEVERITY_SHORT[num] || String(num);
+        return `${label}(${num})`;
+      }
+      case 'facility':
+        if (log.facility_keyword) return String(log.facility_keyword);
+        if (log.facility != null && log.facility !== '') return String(log.facility);
+        return '-';
+      case 'app_name':
+        return log.app_name || '-';
+      case '_msg':
+        return log._msg || '';
+      default:
+        return '';
+    }
+  }
 
   function renderThemeButtons() {
     dom.qa('.theme-btn').forEach((btn) => {
@@ -224,12 +251,7 @@
   function copyRow(index) {
     const log = App.state.runtime.currentLogs[index];
     if (!log) return;
-    const text = [
-      utils.formatTime(log._time),
-      App.query.displayHostname(log.hostname || '-'),
-      log.app_name || '-',
-      log._msg || '',
-    ].join('\t');
+    const text = App.COLUMN_ORDER.map((columnId) => getCopyValue(columnId, log)).join('	');
     navigator.clipboard.writeText(text).then(() => {
       const row = dom.q(`tr[data-row-index="${index}"]`);
       if (row) {
