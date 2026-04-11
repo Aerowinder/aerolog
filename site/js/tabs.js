@@ -32,11 +32,11 @@
   function openTabModal() {
     closeTabEdit();
     App.render.renderTabList();
-    document.getElementById('tab-modal').classList.add('open');
+    App.modals.openModal('tab-modal');
   }
 
   function closeTabModal() {
-    document.getElementById('tab-modal').classList.remove('open');
+    App.modals.closeModal('tab-modal');
     closeTabEdit();
   }
 

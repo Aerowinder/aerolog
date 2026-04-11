@@ -5,8 +5,8 @@
   const OVERLAY_CLOSE = {
     'settings-modal': () => App.modals.closeSettingsModal(),
     'tab-modal': () => App.tabs.closeTabModal(),
-    'aliases-modal': () => App.modals.closeAliasesModal(),
-    'queries-modal': () => App.modals.closeQueriesModal(),
+    'aliases-modal': () => App.aliases.closeAliasesModal(),
+    'queries-modal': () => App.savedQueries.closeQueriesModal(),
   };
 
   function bindStaticEvents() {
@@ -81,17 +81,18 @@
       case 'add-tab': return App.tabs.addTab();
       case 'save-tab-edit': return App.tabs.saveTabEdit();
       case 'delete-tab': return App.tabs.deleteTabFromEdit();
-      case 'open-aliases': return App.modals.openAliasesModal();
-      case 'close-aliases': return App.modals.closeAliasesModal();
-      case 'save-aliases': return App.modals.saveAliases();
-      case 'open-queries': return App.modals.openQueriesModal();
-      case 'close-queries': return App.modals.closeQueriesModal();
-      case 'open-query-edit': return App.modals.openQueryEdit(Number(target.dataset.queryId));
-      case 'close-query-edit': return App.modals.closeQueryEdit();
-      case 'add-query': return App.modals.addQuery();
-      case 'save-query-edit': return App.modals.saveQueryEdit();
-      case 'delete-query': return App.modals.deleteQueryFromEdit();
-      case 'load-query': return App.modals.loadQueryFromEdit();
+      case 'open-aliases': return App.aliases.openAliasesModal();
+      case 'close-aliases': return App.aliases.closeAliasesModal();
+      case 'save-aliases': return App.aliases.saveAliases();
+      case 'open-queries': return App.savedQueries.openQueriesModal();
+      case 'close-queries': return App.savedQueries.closeQueriesModal();
+      case 'open-query-edit': return App.savedQueries.openQueryEdit(Number(target.dataset.queryId));
+      case 'close-query-edit': return App.savedQueries.closeQueryEdit();
+      case 'add-query': return App.savedQueries.addQuery();
+      case 'toggle-default-query': return App.savedQueries.toggleDefaultQuery();
+      case 'save-query-edit': return App.savedQueries.saveQueryEdit();
+      case 'delete-query': return App.savedQueries.deleteQueryFromEdit();
+      case 'load-query': return App.savedQueries.loadQueryFromEdit();
       case 'go-page': return App.tabs.goPage(Number(target.dataset.page));
       case 'copy-row': return App.render.copyRow(Number(target.dataset.rowIndex));
       default: return undefined;

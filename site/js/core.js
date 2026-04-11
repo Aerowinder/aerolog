@@ -1,7 +1,7 @@
 (function () {
   const App = window.Aerolog = window.Aerolog || {};
 
-  App.VERSION = '2026.04.10c';
+  App.VERSION = '2026.04.11a';
 
   App.DEFAULTS = {
     serverUrl: 'localhost:9428',
@@ -28,6 +28,7 @@
     aliases: 'aerolog_aliases',
     columns: 'aerolog_columns',
     queries: 'aerolog_queries',
+    defaultQueryId: 'aerolog_default_query_id',
   };
 
   App.PAGE_BUTTONS = 6;
@@ -43,6 +44,7 @@
     facility:      { target: 'facility_keyword', kind: 'field_glob' },
     fac:           { target: 'facility_keyword', kind: 'field_glob' },
     facility_num:  { target: 'facility', kind: 'field_glob' },
+    sev:           { target: 'severity', kind: 'field_alias' },
     host:          { target: 'hostname', kind: 'host' },
     hostname:      { target: 'hostname', kind: 'host' },
     message:       { target: '_msg', kind: 'field_glob' },
@@ -130,7 +132,7 @@
       return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     },
     quoteLogsQlValue(value) {
-      return `"${String(value).replace(/"/g, '\\"')}"`;
+      return `"${App.utils.escapeLogsQlString(value)}"`;
     },
     uniq(items) {
       return Array.from(new Set(items));
@@ -161,8 +163,8 @@
       return App.VALID.timeRanges.includes(normalized) ? normalized : App.DEFAULTS.timeRange;
     },
     aliases(value) {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-      const out = {};
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return Object.create(null);
+      const out = Object.create(null);
       for (const [raw, friendly] of Object.entries(value)) {
         const rawKey = String(raw || '').trim();
         const friendlyValue = String(friendly || '').trim();
@@ -171,7 +173,7 @@
       return out;
     },
     aliasesText(text) {
-      const out = {};
+      const out = Object.create(null);
       for (const line of String(text || '').split('\n')) {
         const trimmed = line.trim();
         if (!trimmed) continue;
@@ -229,6 +231,12 @@
         out.push({ id, name, query });
       }
       return out;
+    },
+    defaultQueryId(value, queries = []) {
+      if (value == null || value === '') return null;
+      const id = Number(value);
+      if (!Number.isFinite(id)) return null;
+      return queries.some((query) => query.id === id) ? id : null;
     },
     columnLayout(value) {
       const widths = App.utils.clone(App.DEFAULT_COLUMN_LAYOUT.widths);

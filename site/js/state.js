@@ -3,6 +3,9 @@
   const { STORAGE_KEYS, DEFAULTS, validators, utils } = App;
 
   function loadConfig() {
+    const queries = validators.queries(utils.parseJson(localStorage.getItem(STORAGE_KEYS.queries), []));
+    const defaultQueryId = validators.defaultQueryId(localStorage.getItem(STORAGE_KEYS.defaultQueryId), queries);
+    if (defaultQueryId == null) localStorage.removeItem(STORAGE_KEYS.defaultQueryId);
     return {
       serverUrl: validators.serverUrl(localStorage.getItem(STORAGE_KEYS.serverUrl) || DEFAULTS.serverUrl),
       theme: validators.theme(localStorage.getItem(STORAGE_KEYS.theme) || DEFAULTS.theme),
@@ -11,12 +14,18 @@
       timeRange: validators.timeRange(localStorage.getItem(STORAGE_KEYS.timeRange) || DEFAULTS.timeRange),
       tabs: validators.tabs(utils.parseJson(localStorage.getItem(STORAGE_KEYS.tabs), [])),
       aliases: validators.aliases(utils.parseJson(localStorage.getItem(STORAGE_KEYS.aliases), {})),
-      queries: validators.queries(utils.parseJson(localStorage.getItem(STORAGE_KEYS.queries), [])),
+      queries,
+      defaultQueryId,
       columnLayout: validators.columnLayout(utils.parseJson(localStorage.getItem(STORAGE_KEYS.columns), null)),
     };
   }
 
-  function createRuntime() {
+  function defaultQueryText(config) {
+    const query = config.queries.find((entry) => entry.id === config.defaultQueryId);
+    return query ? query.query : '';
+  }
+
+  function createRuntime(config) {
     return {
       activeTabId: 0,
       editingTabId: null,
@@ -25,7 +34,7 @@
       totalPages: 1,
       totalCount: 0,
       currentLogs: [],
-      committedSearch: '',
+      committedSearch: config ? defaultQueryText(config) : '',
       aliasReverse: {},
       lastResponseMs: null,
       lastRefreshCause: 'init',
@@ -52,13 +61,15 @@
     };
   }
 
+  const initialConfig = loadConfig();
+
   App.state = {
-    config: loadConfig(),
-    runtime: createRuntime(),
+    config: initialConfig,
+    runtime: createRuntime(initialConfig),
   };
 
   App.state.rebuildAliasReverse = function rebuildAliasReverse() {
-    const reverse = {};
+    const reverse = Object.create(null);
     for (const [raw, friendly] of Object.entries(App.state.config.aliases)) {
       reverse[friendly] = raw;
     }
@@ -154,8 +165,21 @@
     },
     queries(value) {
       App.state.config.queries = validators.queries(value);
+      App.state.config.defaultQueryId = validators.defaultQueryId(App.state.config.defaultQueryId, App.state.config.queries);
       localStorage.setItem(STORAGE_KEYS.queries, JSON.stringify(App.state.config.queries));
+      if (App.state.config.defaultQueryId == null) {
+        localStorage.removeItem(STORAGE_KEYS.defaultQueryId);
+      }
       return App.state.config.queries;
+    },
+    defaultQueryId(value) {
+      App.state.config.defaultQueryId = validators.defaultQueryId(value, App.state.config.queries);
+      if (App.state.config.defaultQueryId == null) {
+        localStorage.removeItem(STORAGE_KEYS.defaultQueryId);
+      } else {
+        localStorage.setItem(STORAGE_KEYS.defaultQueryId, String(App.state.config.defaultQueryId));
+      }
+      return App.state.config.defaultQueryId;
     },
     columnLayout(value) {
       App.state.config.columnLayout = validators.columnLayout(value);
@@ -174,11 +198,16 @@
   };
 
   App.actions.resetConfig = function resetConfig() {
+    if (App.api) App.api.abortActiveRequest();
+    if (App.polling) {
+      App.polling.clearScheduledPoll();
+      App.polling.resetProgressBar();
+    }
     for (const key of Object.values(STORAGE_KEYS)) {
       localStorage.removeItem(key);
     }
     App.state.config = loadConfig();
-    App.state.runtime = createRuntime();
+    App.state.runtime = createRuntime(App.state.config);
     App.state.rebuildAliasReverse();
     utils.applyDocumentTheme(App.state.config.theme, true);
   };

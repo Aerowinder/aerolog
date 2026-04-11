@@ -76,6 +76,15 @@
     });
   }
 
+  function renderDefaultQueryButton() {
+    const btn = dom.byId('default-query-btn');
+    if (!btn) return;
+    const isDefault = App.state.runtime.editingQueryId != null && App.state.config.defaultQueryId === App.state.runtime.editingQueryId;
+    btn.classList.toggle('active', isDefault);
+    btn.setAttribute('aria-pressed', isDefault ? 'true' : 'false');
+    btn.title = isDefault ? 'This query is the startup default' : 'Use this query on startup';
+  }
+
   function renderToolbarState() {
     dom.byId('page-size').value = App.state.config.pageSize;
     dom.byId('poll-interval').value = App.derive.effectivePollInterval();
@@ -235,7 +244,7 @@
     container.innerHTML = App.state.config.queries.map((query) => `
       <div class="list-item" data-action="open-query-edit" data-query-id="${query.id}">
         <span><b>${utils.escapeHtml(query.name)}</b> <span style="color: var(--text-dim);"><code>${utils.escapeHtml(query.query)}</code></span></span>
-        <span class="edit-icon">view</span>
+        ${App.state.config.defaultQueryId === query.id ? '<span class="default-query-pill">default</span>' : '<span class="edit-icon">view</span>'}
       </div>
     `).join('');
   }
@@ -276,6 +285,7 @@
 
   App.render = {
     renderThemeButtons,
+    renderDefaultQueryButton,
     renderToolbarState,
     renderTableHeader,
     renderLogs,

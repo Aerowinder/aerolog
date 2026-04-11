@@ -124,6 +124,10 @@ Use the Queries UI to save frequently used searches.
 
 This is handy for ugly filters you do not want to retype, like noisy auth failures, device-specific searches, or severity filters with extra conditions.
 
+Saved queries can be marked as the startup default. When a default saved query is set, Aerolog loads it into the search box and uses it for the first search on page load. Refreshing the browser returns to the default query rather than remembering an unsaved ad hoc search.
+
+To choose one, open a saved query and press **Default**. Press it again to clear the startup default.
+
 ## Search syntax
 
 Aerolog sends queries through to VictoriaLogs as LogsQL, with some friendly rewrites and wildcard sugar layered on top.
@@ -140,6 +144,7 @@ One important detail: `*` wildcard handling is **Aerolog behavior**, not officia
 | `time:` or `timestamp:`           | `_time`            |
 | `fac:` or `facility:`             | `facility_keyword` |
 | `facility_num:`                   | `facility`         |
+| `sev:`                            | `severity`         |
 
 ### Matching behavior
 
@@ -148,6 +153,8 @@ For friendly rewritten fields:
 - No `*` means **exact match**
 - `*` means wildcard matching
 - Explicit operators like `:=` and `:~` are still respected as exact and regex matches
+
+`sev:` is a direct shorthand for `severity:` and keeps VictoriaLogs severity syntax.
 
 Examples:
 
@@ -196,6 +203,8 @@ Aerolog also supports severity convenience filtering such as:
 
 - `severity:<4`
 - `severity:3`
+- `sev:<4`
+- `sev:3`
 
 Anything valid in LogsQL should still work. Aerolog is helping a little, not inventing a whole replacement query language.
 
@@ -253,6 +262,7 @@ Aerolog stores its UI state in the browser using localStorage. That includes thi
 - tabs
 - aliases
 - saved queries
+- default saved query
 - selected columns
 - toolbar preferences
 

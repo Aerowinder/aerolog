@@ -1,111 +1,29 @@
 (function () {
   const App = window.Aerolog;
+  let lockedScrollY = 0;
+
+  function lockPageScroll() {
+    if (document.body.classList.contains('modal-open')) return;
+    lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.style.top = `-${lockedScrollY}px`;
+    document.body.classList.add('modal-open');
+  }
+
+  function unlockPageScroll() {
+    if (document.querySelector('.modal-overlay.open')) return;
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, lockedScrollY);
+  }
 
   function openModal(id) {
     document.getElementById(id).classList.add('open');
+    lockPageScroll();
   }
 
   function closeModal(id) {
     document.getElementById(id).classList.remove('open');
-  }
-
-  function openAliasesModal() {
-    document.getElementById('aliases-text').value = App.query.aliasesToText();
-    openModal('aliases-modal');
-  }
-
-  function closeAliasesModal() {
-    closeModal('aliases-modal');
-  }
-
-  async function saveAliases() {
-    const aliases = App.validators.aliasesText(document.getElementById('aliases-text').value);
-    const duplicateFriendly = App.validators.duplicateFriendlyAlias(aliases);
-    if (duplicateFriendly) {
-      App.utils.showAlert(`Friendly alias names must be unique. Duplicate: ${duplicateFriendly}`);
-      return;
-    }
-    App.persist.aliases(aliases);
-    closeAliasesModal();
-    App.render.renderLogs();
-    await App.api.dispatchRefresh('manual');
-  }
-
-  function openQueriesModal() {
-    App.state.runtime.editingQueryId = null;
-    document.getElementById('query-modal-title').textContent = 'Saved Queries';
-    document.getElementById('query-list-view').style.display = 'block';
-    document.getElementById('query-edit-view').style.display = 'none';
-    document.getElementById('new-query-name').value = '';
-    document.getElementById('new-query-text').value = '';
-    App.render.renderQueryList();
-    openModal('queries-modal');
-  }
-
-  function closeQueriesModal() {
-    closeModal('queries-modal');
-  }
-
-  function openQueryEdit(queryId) {
-    const query = App.state.config.queries.find((entry) => entry.id === queryId);
-    if (!query) return;
-    App.state.runtime.editingQueryId = queryId;
-    document.getElementById('edit-query-name').value = query.name;
-    document.getElementById('edit-query-text').value = query.query;
-    document.getElementById('query-modal-title').textContent = `Edit: ${query.name}`;
-    document.getElementById('query-list-view').style.display = 'none';
-    document.getElementById('query-edit-view').style.display = 'block';
-  }
-
-  function closeQueryEdit() {
-    App.state.runtime.editingQueryId = null;
-    document.getElementById('query-modal-title').textContent = 'Saved Queries';
-    document.getElementById('query-list-view').style.display = 'block';
-    document.getElementById('query-edit-view').style.display = 'none';
-    App.render.renderQueryList();
-  }
-
-  function addQuery() {
-    const name = document.getElementById('new-query-name').value.trim();
-    const query = document.getElementById('new-query-text').value.trim();
-    if (!name || !query) {
-      App.utils.showAlert('Query name and text are required');
-      return;
-    }
-    App.persist.queries(App.state.config.queries.concat([{ id: Date.now(), name, query }]));
-    document.getElementById('new-query-name').value = '';
-    document.getElementById('new-query-text').value = '';
-    App.render.renderQueryList();
-  }
-
-  function saveQueryEdit() {
-    if (App.state.runtime.editingQueryId == null) return;
-    const name = document.getElementById('edit-query-name').value.trim();
-    const query = document.getElementById('edit-query-text').value.trim();
-    if (!name || !query) {
-      App.utils.showAlert('Query name and text are required');
-      return;
-    }
-    App.persist.queries(App.state.config.queries.map((entry) => entry.id === App.state.runtime.editingQueryId ? { ...entry, name, query } : entry));
-    closeQueryEdit();
-  }
-
-  function deleteQueryFromEdit() {
-    if (App.state.runtime.editingQueryId == null) return;
-    if (!window.confirm('Delete this saved query?')) return;
-    App.persist.queries(App.state.config.queries.filter((entry) => entry.id !== App.state.runtime.editingQueryId));
-    closeQueryEdit();
-  }
-
-  async function loadQueryFromEdit() {
-    if (App.state.runtime.editingQueryId == null) return;
-    const query = App.state.config.queries.find((entry) => entry.id === App.state.runtime.editingQueryId);
-    if (!query) return;
-    closeQueriesModal();
-    App.state.runtime.committedSearch = query.query;
-    App.state.runtime.currentPage = 1;
-    App.render.renderToolbarState();
-    await App.api.dispatchRefresh('manual');
+    unlockPageScroll();
   }
 
   function openSettingsModal() {
@@ -144,6 +62,7 @@
       aliases: App.state.config.aliases,
       tabs: App.state.config.tabs,
       queries: App.state.config.queries,
+      default_query_id: App.state.config.defaultQueryId,
       columns: { widths: exportedWidths },
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
@@ -151,8 +70,10 @@
     const link = document.createElement('a');
     link.href = url;
     link.download = `aerolog-config-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   async function importConfig(event) {
@@ -172,7 +93,12 @@
         App.persist.aliases(config.aliases);
       }
       if (config.tabs != null) App.persist.tabs(config.tabs);
-      if (config.queries != null) App.persist.queries(config.queries);
+      if (config.queries != null) {
+        App.persist.queries(config.queries);
+        App.persist.defaultQueryId(config.default_query_id);
+      } else if (config.default_query_id != null) {
+        App.persist.defaultQueryId(config.default_query_id);
+      }
       if (config.columns && config.columns.widths) {
         const widths = {};
         for (const [key, width] of Object.entries(config.columns.widths)) {
@@ -194,7 +120,7 @@
   }
 
   async function resetConfig() {
-    if (!window.confirm('Reset all settings? This clears server URL, theme, page size, polling, time range, aliases, tabs, queries, and columns.')) return;
+    if (!window.confirm('Reset all settings? This clears server URL, theme, page size, polling, time range, aliases, tabs, queries, default query, and columns.')) return;
     App.actions.resetConfig();
     App.render.renderAllStatic();
     closeSettingsModal();
@@ -204,17 +130,6 @@
   App.modals = {
     openModal,
     closeModal,
-    openAliasesModal,
-    closeAliasesModal,
-    saveAliases,
-    openQueriesModal,
-    closeQueriesModal,
-    openQueryEdit,
-    closeQueryEdit,
-    addQuery,
-    saveQueryEdit,
-    deleteQueryFromEdit,
-    loadQueryFromEdit,
     openSettingsModal,
     closeSettingsModal,
     saveAllSettings,

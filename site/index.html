@@ -208,7 +208,9 @@
       <label>LogsQL query</label>
       <input type="text" id="edit-query-text">
       <div class="modal-actions">
-        <button class="btn btn-primary" data-action="load-query" style="margin-right: auto;">Load</button>
+        <button class="btn btn-primary" data-action="load-query">Load</button>
+        <button class="btn default-query-btn" id="default-query-btn" data-action="toggle-default-query" aria-pressed="false">Default</button>
+        <span class="modal-actions-spacer"></span>
         <button class="btn" data-action="close-query-edit">Back</button>
         <button class="btn btn-danger" data-action="delete-query">Delete</button>
         <button class="btn btn-primary" data-action="save-query-edit">Save</button>
@@ -225,8 +227,10 @@
 <script src="./js/state.js" defer></script>
 <script src="./js/query.js" defer></script>
 <script src="./js/api.js" defer></script>
-<script src="./js/tabs.js" defer></script>
 <script src="./js/modals.js" defer></script>
+<script src="./js/tabs.js" defer></script>
+<script src="./js/aliases.js" defer></script>
+<script src="./js/saved_queries.js" defer></script>
 <script src="./js/polling.js" defer></script>
 <script src="./js/events.js" defer></script>
 

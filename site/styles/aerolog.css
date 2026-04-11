@@ -81,6 +81,13 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     font-size: 15px;
     line-height: 1.5;
   }
+  body.modal-open {
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+  }
 
   .log-table,
   .log-table td,
@@ -531,6 +538,8 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     max-width: 520px;
     max-height: 90vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   .modal-header-row {
     display: flex;
@@ -588,6 +597,7 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     justify-content: flex-end;
     margin-top: 1rem;
   }
+  .modal-actions-spacer { flex: 1; }
 
   .btn {
     font-family: var(--mono);
@@ -614,7 +624,8 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     text-align: center;
   }
   .theme-btn:hover { border-color: var(--border-hi); }
-  .theme-btn.active {
+  .theme-btn.active,
+  .default-query-btn.active {
     border-color: var(--accent);
     color: var(--accent);
     background: var(--accent-glow);
@@ -649,6 +660,15 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
   .list-item:hover { border-color: var(--border-hi); background: var(--surface2); }
   .list-item .edit-icon { color: var(--text-dim); font-size: 1rem; }
   .list-item:hover .edit-icon { color: var(--accent); }
+  .default-query-pill {
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    background: var(--accent-glow);
+    border-radius: 3px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
 
   .toast {
     position: fixed;

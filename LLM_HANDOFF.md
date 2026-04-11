@@ -33,21 +33,36 @@ Aerolog is meant to stay lean. Do not turn it into a giant platform.
 
 - App name: **Aerolog**
 - Backend target: **VictoriaLogs**
-- Current published release: **2026.04.10c**
-- Current code line: **2026.04.10c**
+- Current release/code line: **2026.04.11a**
 
-Important standing rule:
+## Permission rules
+
+- **Never change the user's code without explicit permission. If you see something that seems like it needs a change, ask before editing.**
+- Treat questions like “do you see anything that could use a refactor?” as read-only review requests unless the user explicitly asks for edits.
+- Even when edits are permitted, keep the scope narrow. Ask before broad refactors, style rewrites, architecture changes, dependency changes, or behavior changes outside the requested issue.
 - **Do not bump the version unless the user explicitly asks for it.**
 
-Other standing rules:
-- Default polling should be **Off** unless the user explicitly wants something else.
-- Include `application` as a friendly rewrite alias for `app_name` unless the user says otherwise.
-- Do not make unrelated UI or behavior changes without permission.
-- The user is regression-sensitive and will absolutely notice when something “helpful” changed that they did not ask for.
+## Documentation rules
+
+- Changelog entries should stay very high-level and user-facing. Do not put implementation details like parser/tokenization internals in the changelog.
+- Update the README only when user-facing behavior, setup, configuration, or project usage changed.
+- Use `LLM_HANDOFF.md` for implementation intent, assistant guardrails, and future-maintainer context that does not belong in the public-facing changelog.
+- The user may provide `README`, handoff, and changelog files separately when they want those updated.
+
+## Packaging rules
+
 - When delivering artifacts, always provide a ZIP package unless the user explicitly asks for loose files.
 - By default, ZIP packages should contain only the project/runtime files and proper folder structure.
 - Do **not** include `README.md`, `LLM_HANDOFF.md`, or `CHANGELOG.md` in a ZIP unless the user explicitly asks for those docs to be included.
-- The user may provide `README`, handoff, and changelog files separately when they want those updated.
+- Do **not** keep adding empty `assets/` or `assets/icons/` folder scaffolding to ZIP artifacts.
+- Do **not** pretend the icon asset is included when it is not.
+- For site icon packaging, follow the Assets section below.
+
+## Other standing rules
+
+- Default polling should be **Off** unless the user explicitly wants something else.
+- Include `application` as a friendly rewrite alias for `app_name` unless the user says otherwise.
+- The user is regression-sensitive and will absolutely notice when something “helpful” changed that they did not ask for.
 
 ---
 
@@ -103,28 +118,29 @@ Typical module responsibilities:
   - pagination actions that interact with tab state
 
 - `modals.js`
+  - generic modal open/close behavior
+  - modal page scroll locking
   - settings
-  - aliases
-  - saved queries
   - import/export/reset
+  - do not put alias or saved-query workflows back here
+
+- `aliases.js`
+  - alias modal workflow
+  - alias save/refresh behavior
+
+- `saved_queries.js`
+  - saved query modal workflow
+  - saved query default toggle
+  - saved query load/save/delete behavior
 
 - `events.js`
   - DOM event binding
   - delegated action routing
   - app initialization
 
+Script order in `site/index.html` matters for these split modules: load `modals.js` before `tabs.js`, `aliases.js`, and `saved_queries.js`, then load `events.js` after those modules so delegated action routing can reference them.
+
 This structure has been easier to work with than the monolith.
-
-
-## 2026.04.10c notes
-
-This release included a small but user-visible polish pass:
-- blocked duplicate friendly alias names
-- adjusted the Settings modal layout and wording
-- added a GitHub link in the Settings modal header
-- kept the poll preference persisted while showing `Poll: Off` in the toolbar when runtime navigation pause disables effective polling
-- moved the mobile-layout breakpoint to 800px
-- let the connection pill size to its content in mobile layout instead of forcing full width
 
 ---
 
@@ -142,6 +158,7 @@ This lives in localStorage and should survive reloads:
 - tabs
 - aliases
 - saved queries
+- default saved query ID
 - column widths / selected columns
 
 ### 2. Runtime state
@@ -183,6 +200,8 @@ Preferred flow:
 3. resolve aliases where needed
 4. compile to final LogsQL
 
+Quoted strings are literal. Do not rewrite friendly fields inside them.
+
 ### Friendly field aliases currently expected
 - `host`
 - `hostname`
@@ -199,6 +218,7 @@ Preferred flow:
 - `facility`
 - `facility_keyword`
 - `facility_num`
+- `sev` → `severity`
 
 ### Matching rules for friendly fields
 For Aerolog's friendly field sugar:
@@ -208,6 +228,8 @@ For Aerolog's friendly field sugar:
 - explicit `:~` stays regex
 
 This is Aerolog behavior, not native LogsQL wildcard syntax.
+
+Exception: `sev` is a direct shorthand for `severity`, so preserve native severity syntax such as `sev:<4` → `severity:<4`.
 
 ### Facility rules
 The UI label is “Facility,” but the backend has both a keyword field and a numeric field.
@@ -236,7 +258,9 @@ That is how earlier wildcard bugs happened.
 Expected hostname behavior:
 - no wildcard = exact host match
 - wildcard = wildcard/regex host match
+- explicit `host:~` / `hostname:~` means the user supplied a regex; pass it through directly
 - aliased host wildcard matching must work
+- friendly alias exact lookup is case-sensitive; do not add a lowercased reverse-alias fallback
 - exact host clauses must use real LogsQL exact syntax:
   - `hostname:="value"`
 
@@ -348,6 +372,20 @@ That keeps modules cleaner and avoids forcing functions onto the global namespac
 
 ---
 
+## Saved query defaults
+
+Only one saved query can be the startup default. Store that as `aerolog_default_query_id`, not as flags on each saved query.
+
+On startup, load and validate saved queries first, resolve the default query ID, set runtime `committedSearch` from that query before the initial refresh, and then run the first search. Do not run an unfiltered initial search first.
+
+Browser refresh should behave like fresh app startup: use the default saved query if one exists, otherwise start with an empty query. Do not persist unsaved ad hoc searches as the startup query.
+
+If the default query is deleted or an imported default query ID does not point at a real saved query, clear the default silently.
+
+The UI control for this is the **Default** button in the saved query edit view. Keep default-query behavior in `saved_queries.js`; shared modal open/close and scroll lock stay in `modals.js`.
+
+---
+
 ## Persistence keys
 
 Current important localStorage keys:
@@ -360,6 +398,7 @@ Current important localStorage keys:
 - `aerolog_aliases`
 - `aerolog_columns`
 - `aerolog_queries`
+- `aerolog_default_query_id`
 
 Important note:
 - old `aerolog_groups` compatibility was intentionally removed
@@ -370,9 +409,11 @@ Do not muddy that again.
 
 ---
 
-## Favicon / assets
+## Assets
 
-Current favicon path expectation:
+The site icon is **user-supplied**.
+
+Current runtime favicon path expectation:
 
 ```text
 ./assets/icons/aerolog.svg
@@ -392,9 +433,6 @@ These matter.
 - If something is uncertain, say so.
 - The user is okay with breaking old compatibility during early development if that is the cleaner choice.
 - The user wants narrow, disciplined changes rather than surprise UI surgery.
-- If a change was not requested, do not casually improvise it.
-- If a version bump happens, it should be because the user explicitly approved it.
-- Prefer ZIP artifacts for delivery unless the user asks for something else.
 
 ---
 
@@ -412,6 +450,7 @@ At minimum, test:
 - alias-aware host matching
 - tab filtering
 - saved query load/save/edit/delete
+- saved query default startup behavior
 - import/export/reset behavior
 - mobile message text size on a real iPhone if message CSS changed
 
@@ -424,23 +463,6 @@ At minimum, test:
 - Do not let DOM selects become the real state store.
 - Do not make polling cadence depend on response return time.
 - Do not overwrite saved poll preference just because the user left page 1.
-- Do not change unrelated UI behavior without permission.
 - Do not silently restore removed compatibility baggage like `aerolog_groups`.
 
 If in doubt, keep behavior stable and make the change smaller.
-
----
-
-## Asset handling rule
-
-The site icon is **user-supplied**.
-
-Expected runtime path:
-- `/assets/icons/aerolog.svg`
-
-Important packaging rule:
-- Do **not** keep adding empty `assets/` or `assets/icons/` folder scaffolding to ZIP artifacts.
-- Do **not** pretend the icon asset is included when it is not.
-- Future ZIPs should assume the user already has `/assets/icons/aerolog.svg` and will place it themselves.
-
-If a build references the favicon, reference the path above, but do not pad the ZIP with empty directories just to look complete.

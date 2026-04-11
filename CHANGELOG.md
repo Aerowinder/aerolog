@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026.04.11a
+- Added `sev:` as shorthand for `severity:`.
+- Added support for marking one saved query as the startup default.
+- Fixed several edge cases in friendly query rewriting.
+- Improved hostname alias handling while keeping exact alias matches case-sensitive.
+- Improved config export and reset reliability.
+- Prevented the page behind a modal from scrolling on small viewports.
+
 ## 2026.04.10c
 - Blocked duplicate friendly alias names so one friendly name cannot map to multiple systems.
 - Rearranged the Settings window.

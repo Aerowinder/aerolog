@@ -20,7 +20,47 @@
   }
 
   function resolveExactHost(value) {
-    return App.state.runtime.aliasReverse[value] || value;
+    const { aliasReverse } = App.state.runtime;
+    if (Object.prototype.hasOwnProperty.call(aliasReverse, value)) return aliasReverse[value];
+    return value;
+  }
+
+  function createQuoteTracker(query) {
+    let index = 0;
+    let insideQuote = false;
+    let escaped = false;
+
+    return function isInsideQuotedString(targetIndex) {
+      for (; index < targetIndex; index += 1) {
+        const char = query[index];
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          insideQuote = !insideQuote;
+        }
+      }
+      return insideQuote;
+    };
+  }
+
+  function splitUnquotedValue(value) {
+    const raw = String(value || '');
+    let end = raw.length;
+    let depth = 0;
+    for (let i = 0; i < end; i += 1) {
+      if (raw[i] === '(') depth += 1;
+      if (raw[i] === ')') depth -= 1;
+    }
+    while (end > 0 && raw[end - 1] === ')' && depth < 0) {
+      end -= 1;
+      depth += 1;
+    }
+    return {
+      value: raw.slice(0, end),
+      suffix: raw.slice(end),
+    };
   }
 
   function buildExactHostnameClause(value) {
@@ -31,7 +71,7 @@
     const trimmed = String(value || '').trim();
     if (!trimmed) return '';
     if (operator === ':=') return buildExactHostnameClause(trimmed);
-    if (operator === ':~') return `hostname:~${utils.quoteLogsQlValue(trimmed.startsWith('^') || trimmed.endsWith('$') ? trimmed : utils.wildcardToRegex(trimmed))}`;
+    if (operator === ':~') return `hostname:~${utils.quoteLogsQlValue(trimmed)}`;
     if (!utils.hasWildcard(trimmed)) return buildExactHostnameClause(trimmed);
 
     const clauses = [`hostname:~${utils.quoteLogsQlValue(utils.wildcardToRegex(trimmed))}`];
@@ -61,24 +101,40 @@
     return `${target}:=${formatExact(trimmed)}`;
   }
 
+  function compileFieldAliasClause(target, value, operator = ':', wasQuoted = false) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+    const renderedValue = wasQuoted ? utils.quoteLogsQlValue(trimmed) : trimmed;
+    return `${target}${operator}${renderedValue}`;
+  }
+
   function tokenizeFriendlyQuery(input) {
     const query = String(input || '');
     const tokens = [];
     let lastIndex = 0;
+    const isInsideQuotedString = createQuoteTracker(query);
     fieldPattern.lastIndex = 0;
     let match;
     while ((match = fieldPattern.exec(query))) {
+      if (isInsideQuotedString(match.index)) {
+        continue;
+      }
       if (match.index > lastIndex) {
         tokens.push({ type: 'text', value: query.slice(lastIndex, match.index) });
       }
+      const quoted = match[5] != null;
+      const valueParts = quoted ? { value: match[5], suffix: '' } : splitUnquotedValue(match[6]);
       tokens.push({
         type: 'field',
         lead: match[1] || '',
         alias: match[2],
         operator: (match[3] || ':').replace(/\s+/g, ''),
-        quoted: match[5] != null,
-        value: match[5] != null ? match[5] : match[6],
+        quoted,
+        value: valueParts.value,
       });
+      if (valueParts.suffix) {
+        tokens.push({ type: 'text', value: valueParts.suffix });
+      }
       lastIndex = fieldPattern.lastIndex;
     }
     if (lastIndex < query.length) {
@@ -101,6 +157,9 @@
       const lead = token.lead || '';
       if (token.spec.kind === 'host') {
         return `${lead}${compileHostClause(token.value, token.operator)}`;
+      }
+      if (token.spec.kind === 'field_alias') {
+        return `${lead}${compileFieldAliasClause(token.spec.target, token.value, token.operator, token.quoted)}`;
       }
       return `${lead}${compileFieldClause(token.spec.target, token.value, token.operator, token.quoted)}`;
     }).join('');
@@ -144,7 +203,9 @@
       return `${buildFilterClause()} | stats count() as c`;
     },
     displayHostname(hostname) {
-      return App.state.config.aliases[hostname] || hostname;
+      return Object.prototype.hasOwnProperty.call(App.state.config.aliases, hostname)
+        ? App.state.config.aliases[hostname]
+        : hostname;
     },
     aliasesToText() {
       return Object.entries(App.state.config.aliases).map(([raw, friendly]) => `${raw} = ${friendly}`).join('\n');
