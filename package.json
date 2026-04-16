@@ -1,0 +1,10 @@
+{
+  "name": "aerolog",
+  "version": "1.00",
+  "private": true,
+  "description": "Lightweight browser frontend for VictoriaLogs.",
+  "scripts": {
+    "test": "node site/tests/run_tests.js"
+  },
+  "license": "MIT"
+}

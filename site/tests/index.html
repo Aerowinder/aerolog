@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aerolog Tests</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.4; }
+  pre { background: #111; color: #eee; padding: 1rem; white-space: pre-wrap; }
+  .pass { color: #157347; }
+  .fail { color: #b02a37; }
+</style>
+</head>
+<body>
+<h1>Aerolog Browser Tests</h1>
+<p>Dependency-free smoke tests for browser-loaded modules. The full repeatable test runner is <code>node site/tests/run_tests.js</code>.</p>
+<pre id="test-output">Running...</pre>
+
+<script src="../js/core.js"></script>
+<script src="../js/state.js"></script>
+<script src="../js/query_history.js"></script>
+<script src="../js/query.js"></script>
+<script src="../js/config_io.js"></script>
+<script src="../js/actions.js"></script>
+<script src="./browser_tests.js"></script>
+</body>
+</html>

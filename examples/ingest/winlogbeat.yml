@@ -1,0 +1,112 @@
+winlogbeat.event_logs:
+  # Event logs and severity levels to send. Be careful including 'information', as it is very spammy
+  - name: Application
+    level: critical, error, warning
+    ignore_older: 96h
+  - name: System
+    level: critical, error, warning
+    ignore_older: 96h
+  - name: System
+    id: system-eid
+    event_id: 104
+    ignore_older: 96h
+  - name: Security
+    event_id: 1102, 4625, 4647, 4657, 4663, 4689, 4725, 4726, 4768, 4771, 4776
+    ignore_older: 96h
+  - name: Setup
+    level: critical, error, warning
+    ignore_older: 96h
+  - name: ForwardedEvents
+    forwarded: true
+    level: critical, error, warning
+    ignore_older: 96h
+  - name: Microsoft-Windows-Windows Defender/Operational
+    level: critical, error, warning
+    ignore_older: 96h
+  - name: Microsoft-Windows-Sysmon/Operational
+    level: critical, error, warning
+    ignore_older: 96h
+  - name: Microsoft-Windows-TerminalServices-LocalSessionManager/Operational
+    level: critical, error, warning
+    ignore_older: 96h
+  - name: Microsoft-Windows-PowerShell/Operational
+    level: critical, error, warning
+    ignore_older: 96h
+
+processors:
+  # Copy winlogbeat fields to the fields that VictoriaLogs is expecting, severity is handled in the script below
+  - copy_fields:
+      fields:
+        - from: host.name
+          to: hostname
+        - from: winlog.channel
+          to: facility_keyword
+        - from: event.provider
+          to: app_name
+      fail_on_error: false
+      ignore_missing: true
+
+  # Drop spam
+  - drop_fields:
+      fields:
+        - winlog.event_data
+      ignore_missing: true
+
+  # Transform severity into an integer so it can be searched correctly
+  - script:
+      lang: javascript
+      source: >
+        function process(event) {
+          var level = event.Get("log.level");
+          if (!level) return;
+
+          level = String(level).toLowerCase();
+
+          var map = {
+            critical: 2,
+            error: 3,
+            warning: 4,
+            information: 6,
+            informational: 6,
+            info: 6,
+            debug: 7,
+            verbose: 7
+          };
+
+          if (map[level] !== undefined) {
+            event.Put("severity", map[level]);
+          }
+        }
+
+# Flush captured events (min 1) to VictoriaLogs every 10 seconds
+queue.mem:
+  flush.timeout: 10s
+  flush.min_events: 1
+
+# Output to VictoriaLogs. Port must be specified or winlogbeat assumes 9200 (Elasticsearch). Port will be 9428 for VictoriaLogs (or 80/443 with a reverse proxy).
+output.elasticsearch:
+  hosts: ["http://<vl-server:port>/insert/elasticsearch/"]
+  parameters:
+    _msg_field: "message"
+    _time_field: "@timestamp"
+    _stream_fields: "event.provider,host.name,winlog.event_id"
+  compression_level: 1
+
+
+
+
+# Event IDs
+  # System
+    # 104 = Event log cleared
+  # Security
+    # 1102 = Security log cleared
+    # 4625 = Failed logon attempt
+    # 4647 = User explicitly logged off
+    # 4657 = Registry value changed
+    # 4663 = Access performed on an object (file, folder, registry, etc.)
+    # 4689 = Process terminated
+    # 4725 = Account disabled
+    # 4726 = Account deleted
+    # 4768 = Kerberos TGT request / authentication attempt
+    # 4771 = Kerberos pre-authentication failure
+    # 4776 = NTLM authentication / credential validation

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en" class="aerolog-init">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src http: https:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Aerolog</title>
+<script>
+(function() {
+  try {
+    var settings = JSON.parse(localStorage.getItem('aerolog_settings')) || {};
+    document.documentElement.setAttribute('data-theme', settings.theme || 'system');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'system');
+  }
+})();
+</script>
+<link rel="preload" href="./styles/aerolog.css" as="style">
+<link rel="stylesheet" href="./styles/aerolog.css">
+<link rel="icon" type="image/svg+xml" href="./assets/icons/aerolog.svg">
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">Aerolog <span class="version" id="version-text"></span></div>
+  </div>
+  <span class="conn-status" id="conn-status" role="status" aria-live="polite">
+    <span class="dot"></span>
+    <span class="host-text">not connected</span>
+    <span class="conn-progress" id="conn-progress"></span>
+  </span>
+  <div class="header-right">
+    <div class="stats-stack">
+      <span id="stat-logs"><b>--</b> available logs</span>
+      <span id="stat-resp"><b>--</b> response time</span>
+    </div>
+    <button class="header-btn" data-action="open-settings" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="toolbar">
+  <div class="search-box" id="search-box">
+    <input type="text" id="search" placeholder="search (LogsQL), try: error, app:sshd, severity:&lt;4 (press enter)" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <button class="search-clear" data-action="clear-search" type="button" title="Clear query" aria-label="Clear query">X</button>
+    <button class="search-history-toggle" data-action="toggle-query-history" type="button" aria-expanded="false" aria-controls="query-history-menu" title="Recent queries" aria-label="Recent queries">V</button>
+    <div class="query-history-menu" id="query-history-menu"></div>
+  </div>
+  <button class="btn-search" data-action="search">Search</button>
+
+  <div class="toolbar-selects">
+    <select class="mini-select" id="poll-interval">
+      <option value="off" selected>Poll: Off</option>
+      <option value="1">Poll: 1s</option>
+      <option value="5">Poll: 5s</option>
+      <option value="10">Poll: 10s</option>
+      <option value="30">Poll: 30s</option>
+      <option value="60">Poll: 1m</option>
+    </select>
+    <select class="mini-select" id="page-size">
+      <option value="25">Rows: 25</option>
+      <option value="50">Rows: 50</option>
+      <option value="100" selected>Rows: 100</option>
+      <option value="250">Rows: 250</option>
+      <option value="500">Rows: 500</option>
+      <option value="1000">Rows: 1000</option>
+    </select>
+    <div class="time-range-group">
+      <select class="mini-select" id="time-range">
+        <option value="5m">Last: 5m</option>
+        <option value="15m">Last: 15m</option>
+        <option value="30m">Last: 30m</option>
+        <option value="1h" selected>Last: 1h</option>
+        <option value="3h">Last: 3h</option>
+        <option value="6h">Last: 6h</option>
+        <option value="12h">Last: 12h</option>
+        <option value="1d">Last: 1d</option>
+        <option value="1w">Last: 1w</option>
+        <option value="30d">Last: 30d</option>
+        <option value="90d">Last: 90d</option>
+        <option value="180d">Last: 180d</option>
+        <option value="1y">Last: 1y</option>
+        <option value="custom">Last: Custom</option>
+      </select>
+      <button class="mini-btn time-custom-edit" id="time-custom-edit" data-action="open-custom-time" type="button">Edit</button>
+    </div>
+  </div>
+</div>
+
+<div class="log-wrap">
+  <table class="log-table" id="log-table">
+    <thead><tr id="log-thead"></tr></thead>
+    <tbody id="log-body">
+      <tr><td class="empty">not connected - configure a server in settings</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="pagination">
+  <div class="pager-buttons" id="pager-buttons"></div>
+  <div class="pager-meta" id="pager-meta">Page 1 of 1 - 0 logs - --</div>
+</div>
+
+<div class="field-filter-menu" id="field-filter-menu" hidden></div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <div class="modal-header-row">
+      <h3>Settings</h3>
+      <a class="modal-header-link" href="https://github.com/aerowinder/aerolog" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </div>
+
+    <h4>VictoriaLogs Server</h4>
+    <label>Server URL</label>
+    <input type="text" id="server-url" placeholder="localhost:9428" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <p class="hint">Address of VictoriaLogs server. HTTPS will be assumed if HTTP is not specified.</p>
+
+    <hr class="sep">
+
+    <h4>Theme</h4>
+    <div class="choice-row theme-row">
+      <label class="choice-option"><input class="theme-choice" type="radio" name="theme" value="system"> System</label>
+      <label class="choice-option"><input class="theme-choice" type="radio" name="theme" value="light"> Light</label>
+      <label class="choice-option"><input class="theme-choice" type="radio" name="theme" value="dark"> Dark</label>
+    </div>
+    <p class="hint">Use your system theme, or choose a fixed theme.</p>
+
+    <hr class="sep">
+
+    <h4>Tab Visibility</h4>
+    <div class="choice-row tool-row">
+      <label class="choice-option"><input class="tool-toggle" type="checkbox" data-tool-tab="tabs"> Tabs</label>
+      <label class="choice-option"><input class="tool-toggle" type="checkbox" data-tool-tab="aliases"> Aliases</label>
+      <label class="choice-option"><input class="tool-toggle" type="checkbox" data-tool-tab="heartbeats"> Heartbeats</label>
+    </div>
+    <p class="hint">Choose which tools appear in the tab strip.</p>
+
+    <hr class="sep">
+
+    <h4>Log Table</h4>
+    <label>Message lines</label>
+    <div class="choice-row message-lines-row" id="message-lines">
+      <label class="choice-option compact-choice"><input class="message-lines-choice" type="radio" name="message-lines" value="1"> 1</label>
+      <label class="choice-option compact-choice"><input class="message-lines-choice" type="radio" name="message-lines" value="2"> 2</label>
+      <label class="choice-option compact-choice"><input class="message-lines-choice" type="radio" name="message-lines" value="3"> 3</label>
+      <label class="choice-option compact-choice"><input class="message-lines-choice" type="radio" name="message-lines" value="4"> 4</label>
+      <label class="choice-option compact-choice"><input class="message-lines-choice" type="radio" name="message-lines" value="5"> 5</label>
+    </div>
+    <p class="hint">Allow long messages to wrap in the table.</p>
+    <div class="choice-stack">
+      <label class="choice-option"><input class="row-action-toggle" type="checkbox" data-row-action="expand"> Expand row</label>
+      <p class="hint inline-hint">Enable expanding each row to see hidden data.</p>
+      <label class="choice-option"><input class="row-action-toggle" type="checkbox" data-row-action="copy"> Copy row</label>
+      <p class="hint inline-hint">Enable one-click row copy to clipboard.</p>
+      <label class="choice-option"><input class="row-action-toggle" type="checkbox" data-row-action="filter"> Click-to-filter</label>
+      <p class="hint inline-hint">Enable include/exclude filtering from structured log fields.</p>
+    </div>
+
+    <hr class="sep">
+
+    <h4>Config Management</h4>
+    <div class="btn-row">
+      <button class="btn btn-danger" data-action="reset-config">Reset All</button>
+      <button class="btn" data-action="trigger-import">Import</button>
+      <button class="btn" data-action="export-config">Export</button>
+    </div>
+    <input type="file" id="import-file" accept="application/json" style="display: none;">
+
+    <hr class="sep">
+
+    <p class="hint shortcuts-hint">Press <kbd>?</kbd> anywhere to see keyboard shortcuts.</p>
+
+    <div class="modal-actions">
+        <button class="btn btn-primary" data-action="done-settings">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tab management modal -->
+<div class="modal-overlay" id="tab-modal">
+  <div class="modal">
+    <h3 id="tab-modal-title">Tabs</h3>
+
+    <div id="tab-list-view">
+      <div id="tab-list"></div>
+      <hr class="sep">
+      <h4>Add New Tab</h4>
+      <label>Tab name</label>
+      <input type="text" id="new-tab-name" placeholder="e.g. Web Servers" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+      <label>Hostnames (one per line, exact match unless * is used; aliases supported)</label>
+      <textarea id="new-tab-hosts" placeholder="pve2&#10;web-*&#10;router-01" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-action="close-tab-modal">Close</button>
+        <button class="btn btn-primary" data-action="add-tab">Add Tab</button>
+      </div>
+    </div>
+
+    <div id="tab-edit-view" style="display: none;">
+      <label>Tab name</label>
+      <input type="text" id="edit-tab-name" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+      <label>Hostnames (one per line, exact match unless * is used; aliases supported)</label>
+      <textarea id="edit-tab-hosts" rows="10" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-action="close-tab-edit">Back</button>
+        <button class="btn btn-danger" data-action="delete-tab">Delete</button>
+        <button class="btn btn-primary" data-action="save-tab-edit">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Aliases modal -->
+<div class="modal-overlay" id="aliases-modal">
+  <div class="modal">
+    <h3>Hostname Aliases</h3>
+    <label>Map raw hostnames or IPs to friendly names</label>
+    <textarea id="aliases-text" rows="10" placeholder="10.0.0.5 = router-01&#10;192.168.1.50 = firewall&#10;172.16.0.1 = core-switch" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
+    <p class="hint">One alias per line, <b>raw = friendly</b>. Aliases apply to the display, search queries, and tabs. Use the friendly name in <code>host:</code> or <code>hostname:</code> filters. Exact matches stay exact; use <code>*</code> when you want fuzzy matching.</p>
+    <div class="modal-actions">
+      <button class="btn" data-action="close-aliases">Close</button>
+      <button class="btn btn-primary" data-action="save-aliases">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="heartbeats-modal">
+  <div class="modal">
+    <h3>Heartbeats</h3>
+    <p class="hint">Host activity for the selected time range: <b id="heartbeats-range"></b></p>
+    <div class="heartbeats-wrap">
+      <table class="heartbeats-table">
+        <thead>
+          <tr>
+            <th>Host</th>
+            <th>Messages</th>
+            <th><span class="desktop-label">Last Seen</span><span class="mobile-label">Last</span></th>
+          </tr>
+        </thead>
+        <tbody id="heartbeats-body">
+          <tr><td colspan="3" class="empty">Open Heartbeats to load host activity</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-action="close-heartbeats">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="custom-time-modal">
+  <div class="modal">
+    <h3>Custom Time Range</h3>
+    <p class="hint">Choose the local browser time window Aerolog should send to VictoriaLogs.</p>
+    <label>Start</label>
+    <input type="datetime-local" id="custom-time-start" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <label>End</label>
+    <input type="datetime-local" id="custom-time-end" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <div class="modal-actions">
+      <button class="btn" data-action="close-custom-time">Cancel</button>
+      <button class="btn btn-danger" data-action="clear-custom-time">Clear</button>
+      <button class="btn btn-primary" data-action="apply-custom-time">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="shortcuts-modal">
+  <div class="modal">
+    <h3>Keyboard Shortcuts</h3>
+    <dl class="shortcuts-list">
+      <dt><kbd>/</kbd></dt><dd>Focus the search box</dd>
+      <dt><kbd>r</kbd></dt><dd>Refresh now</dd>
+      <dt><kbd>[</kbd> <span class="shortcuts-sep">/</span> <kbd>]</kbd></dt><dd>Previous / next page</dd>
+      <dt><kbd>Home</kbd> <span class="shortcuts-sep">/</span> <kbd>End</kbd></dt><dd>First / last page</dd>
+      <dt><kbd>?</kbd></dt><dd>Toggle this help</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close any open modal</dd>
+    </dl>
+    <p class="hint shortcuts-blurb">Shortcuts are inactive while typing in a text field. <kbd>Esc</kbd> drops focus from the search box and closes any open modal.</p>
+    <div class="modal-actions">
+      <button class="btn" data-action="close-shortcuts">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">copied</div>
+
+
+<script src="./js/core.js" defer></script>
+<script src="./js/state.js" defer></script>
+<script src="./js/query_history.js" defer></script>
+<script src="./js/render.js" defer></script>
+<script src="./js/render_table.js" defer></script>
+<script src="./js/render_pager.js" defer></script>
+<script src="./js/render_tabs.js" defer></script>
+<script src="./js/query.js" defer></script>
+<script src="./js/field_filters.js" defer></script>
+<script src="./js/api.js" defer></script>
+<script src="./js/config_io.js" defer></script>
+<script src="./js/modals.js" defer></script>
+<script src="./js/tabs.js" defer></script>
+<script src="./js/aliases.js" defer></script>
+<script src="./js/heartbeats.js" defer></script>
+<script src="./js/polling.js" defer></script>
+<script src="./js/actions.js" defer></script>
+<script src="./js/shortcuts.js" defer></script>
+<script src="./js/events.js" defer></script>
+
+
+</body>
+</html>
