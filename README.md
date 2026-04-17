@@ -10,7 +10,7 @@ Screenshots:
 
 ![Dark mode dashboard](site/assets/screenshots/dashboard_dark.png)
 
-**Light Mode-**
+**Light Mode**
 
 ![Light mode dashboard](site/assets/screenshots/dashboard_light.png)
 
