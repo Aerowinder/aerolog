@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.01
+- Error toasts now use clearer wording, red styling, and stay visible longer.
+- Toasts now stay visible a little longer in general.
+- Updated the README to clarify Aerolog's intended Linux syslog and Windows Event Logs focus, and to point advanced VictoriaLogs requests to VMUI.
+
 ## 1.00
 - Switched to semantic versioning.
 - Added a Quickstart section to the README.

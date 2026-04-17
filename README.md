@@ -4,6 +4,16 @@ Aerolog is a lightweight browser frontend for VictoriaLogs. It keeps the footpri
 
 This project is vibe coded. Most of the heavy lifting was done by LLMs, with human oversight, testing, and a lot of telling the machine to stop being clever.
 
+Screenshots:
+
+**Dark Mode**
+
+![Dark mode dashboard](site/assets/screenshots/dashboard_dark.png)
+
+**Light Mode-**
+
+![Light mode dashboard](site/assets/screenshots/dashboard_light.png)
+
 ## Quickstart
 
 1. Clone the repository or download a release.
@@ -18,7 +28,7 @@ No build step, no backend, no dependencies.
 
 Aerolog talks directly to VictoriaLogs and gives you a cleaner UI for browsing logs. It is not trying to replace VictoriaLogs, and it is not trying to become a full observability platform. It is a fast, local-state log viewer with a few focused conveniences layered on top.
 
-If VMUI already does everything you need, great. If you want tabs, aliases, query history, and friendlier search sugar, that is where Aerolog fits.
+Aerolog is primarily meant for Linux syslog and Windows Event Logs workflows. If VMUI already does everything you need, great. If you want tabs, aliases, query history, and friendlier search sugar for common day-to-day browsing, that is where Aerolog fits. More advanced VictoriaLogs requests should still be handled in VictoriaLogs VMUI or other methods.
 
 ## What Aerolog adds
 

@@ -96,7 +96,7 @@
     const start = startValue ? new Date(startValue) : null;
     const end = endValue ? new Date(endValue) : null;
     if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start.getTime() >= end.getTime()) {
-      App.utils.showAlert('Choose a valid start time before the end time.');
+      App.toasts.error('Choose a start time before the end time');
       return;
     }
     closeModal('custom-time-modal');
@@ -131,9 +131,9 @@
       App.render.renderAllStatic();
       closeSettingsModal();
       await App.polling.applyPolling('settings');
-      App.utils.showAlert('Config imported successfully');
+      App.toasts.success('Config imported');
     } catch (err) {
-      App.utils.showAlert(`Failed to import config: ${err.message}`);
+      App.toasts.error(`Config import failed: ${err.message}`);
     } finally {
       event.target.value = '';
     }

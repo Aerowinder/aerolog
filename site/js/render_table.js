@@ -245,8 +245,8 @@
         row.classList.add('copied');
         setTimeout(() => row.classList.remove('copied'), 400);
       }
-      App.render.showToast('copied row');
-    }).catch(() => App.render.showToast('copy failed'));
+      App.toasts.success('Row copied');
+    }).catch(() => App.toasts.error('Could not copy row'));
   }
 
   Object.assign(App.render, {

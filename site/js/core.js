@@ -1,7 +1,7 @@
 (function () {
   const App = window.Aerolog = window.Aerolog || {};
 
-  App.VERSION = '1.00';
+  App.VERSION = '1.01';
 
   App.COLUMN_DEFS = {
     '_time':    { label: 'Timestamp', width: 220, exportKey: 'time',     className: 'ts'   },
@@ -180,13 +180,6 @@
       const [item] = next.splice(index, 1);
       next.splice(nextIndex, 0, item);
       return next;
-    },
-    showAlert(message) {
-      if (App.render && typeof App.render.showToast === 'function') {
-        App.render.showToast(message);
-        return;
-      }
-      window.alert(message);
     },
   };
 

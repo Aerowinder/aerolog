@@ -139,9 +139,7 @@
       return true;
     } catch (err) {
       console.error(`[aerolog] failed to persist ${key}:`, err);
-      if (App.render && typeof App.render.showToast === 'function') {
-        App.render.showToast('settings not saved');
-      }
+      App.toasts.error('Settings could not be saved');
       return false;
     }
   }

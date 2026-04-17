@@ -147,8 +147,13 @@ function installActionStubs(App) {
     clearScheduledPoll() { calls.push('clearScheduledPoll'); },
     resetProgressBar() { calls.push('resetProgressBar'); },
   };
-  App.utils.showAlert = function showAlert(message) {
-    calls.push(`showAlert:${message}`);
+  App.toasts = {
+    show(message, options = {}) {
+      const kind = options.kind || 'success';
+      calls.push(`toast:${kind}:${message}`);
+    },
+    success(message) { calls.push(`toast:success:${message}`); },
+    error(message) { calls.push(`toast:error:${message}`); },
   };
   return calls;
 }

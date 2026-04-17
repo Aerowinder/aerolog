@@ -69,7 +69,7 @@ test('invalid custom time action does not erase an existing valid custom range',
   await App.actions.applyCustomTimeRange({ start: 'bad', end: 'also-bad' });
   assertEqual(App.state.config.logview.timerange, 'custom');
   assertEqual(App.state.config.logview.timecustom.start, '2026-04-13T10:00:00.000Z');
-  assertDeepEqual(calls, ['showAlert:Choose a valid start and end time.']);
+  assertDeepEqual(calls, ['toast:error:Choose a valid start and end time']);
 });
 
 test('setPollInterval clears every side-effect pause and force-closes expanded rows when enabling polling', async () => {

@@ -36,6 +36,9 @@ Keep it lean. Do not turn it into a platform.
 - Okay with breaking old compatibility during early development if that's the cleaner choice.
 - Wants narrow, disciplined changes rather than surprise UI surgery.
 
+### Compatibility shims
+Do not add or preserve "just in case" compatibility wrappers, aliases, or fallback helpers. If something is superseded, delete it; callers should move to the real API. The one exception is settings import/export migrations, which live in `settings_migration.js` (see §12). Toasts are owned by `App.toasts` and call sites use `App.toasts.success(...)` / `App.toasts.error(...)` directly — do not reintroduce a `showAlert`, `notify`, or similar indirection in `App.utils`.
+
 ### Documentation
 - **CHANGELOG.md** — high-level and user-facing only. No implementation/parser internals.
 - **README.md** — update only when user-facing behavior, setup, configuration, or usage changes.
@@ -76,12 +79,14 @@ The app started as a single HTML file. That made early experimentation easy but 
 | File | Role |
 |---|---|
 | `core.js` | constants, storage keys, generic utilities, validation, shared config metadata |
+| `toasts.js` | toast rendering, success/error color and duration rules, notification helpers behind `App.toasts` |
 | `state.js` | persisted config, runtime state, derived helpers, `App.persist.*` factory |
 | `config_io.js` | config export object construction, compact key mapping, import application, local-time export filename |
+| `settings_migration.js` | ordered settings-version migration steps for imported configs; exposes `App.settingsMigration.migrate(config, importVersion)` called from `config_io.js` |
 | `actions.js` | user-level action orchestration — the mutate → persist → render/refresh sequencing lives here so workflow modules do not reimplement it |
 | `query.js` | friendly query parsing, field alias normalization, wildcard/exact compilation, alias-aware host clauses |
 | `query_history.js` | recent query history popover, pin/default/remove/clear, default-pinned ordering. Do not fold this back into `render.js` or `state.js` |
-| `render.js` | shared render facade, toolbar state, settings controls, stats, response time, connection pill, toasts |
+| `render.js` | shared render facade, toolbar state, settings controls, stats, response time, connection pill |
 | `render_table.js` | log table rendering, column resize + double-click auto-size, copy button/row visuals, message preview line count, expanded detail rendering |
 | `render_pager.js` | pager button count, pager metadata text, pagination rendering |
 | `render_tabs.js` | tab strip rendering, overflow detection, tab list in Tabs modal |
@@ -96,9 +101,11 @@ The app started as a single HTML file. That made early experimentation easy but 
 | `events.js` | DOM event binding, delegated `data-action` routing, app init |
 
 ### Script order in `index.html` (matters)
+- `toasts.js` after `core.js`
 - `state.js` before `query_history.js`
 - `render.js` before `render_table.js`, `render_pager.js`, `render_tabs.js`
 - `field_filters.js` after `query.js`
+- `settings_migration.js` before `config_io.js`
 - `config_io.js` before `modals.js`
 - `modals.js` before `tabs.js`, `aliases.js`, `heartbeats.js`
 - `actions.js` after `polling.js`
@@ -373,11 +380,15 @@ Internal `App.state.config` uses the same six-key shape. `App.persist` exposes n
 **Sync rule — the three shapes (export JSON, `aerolog_*` localStorage blobs, internal `App.state.config`) must stay identical, keyed the same way at every level.** Adding or renaming a settings field means touching all three together; the sync test in `site/tests/config.test.js` (`internal config, localStorage groups, and export JSON shapes stay in sync`) enforces the top-level shape and sample nested shapes. Extend it when you add new fields.
 
 ### Config import versioning
-Imports with `settings_version` < 100 are rejected (pre-1.00 exports). Versions >= 100 are accepted and run through ordered migration steps in `applyImportedConfig`. When bumping `SETTINGS_VERSION`, add a migration block for the old version before the import logic applies values. The pattern is:
+Imports with `settings_version` < 100 are rejected (pre-1.00 exports). Versions >= 100 are accepted and run through ordered migration steps registered in `settings_migration.js`. `config_io.applyImportedConfig` calls `App.settingsMigration.migrate(config, importVersion)` after the version check and before applying values, so migrations reshape the raw imported object in place before validators run.
+
+When bumping `SETTINGS_VERSION` with a shape change, append a new step to the `STEPS` array in `settings_migration.js`:
 
 ```js
-if (importVersion < 200) { /* migrate 100 → 200 shape */ }
+{ fromVersion: 100, toVersion: 200, migrate(config) { /* reshape 100 → 200 */ } }
 ```
+
+Keep each step narrow — only touch the fields that actually changed. Validators still run afterward, so migrations do not need to re-validate values. `settings_migration.js` is the **only** sanctioned place for compatibility handling; do not scatter version-specific coercions into `config_io.js` or validators.
 
 Only current `aerolog_*` keys are supported.
 
@@ -442,5 +453,6 @@ The checklist below is the residue that Node tests can't reach: real paint timin
 - overwrite the saved poll preference on any side-effect pause
 - silently re-enable polling after a side-effect pause clears
 - add settings migration or compatibility handling without being asked
+- reintroduce compatibility shims such as `showAlert` or `App.utils.notify` — `App.toasts` owns toasts; call sites use `App.toasts.success(...)` / `App.toasts.error(...)` directly
 
 When in doubt, keep behavior stable and make the change smaller.

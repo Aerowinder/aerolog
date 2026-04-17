@@ -18,7 +18,7 @@ test('aerolog.css uses only the 1000px responsive breakpoint', () => {
 });
 
 function loadAppWithRender() {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'render.js', 'render_table.js', 'render_pager.js', 'render_tabs.js', 'query.js']);
+  const App = loadApp({}, ['core.js', 'toasts.js', 'state.js', 'query_history.js', 'render.js', 'render_table.js', 'render_pager.js', 'render_tabs.js', 'query.js']);
   const tbody = { innerHTML: '' };
   const versionText = { textContent: '' };
   const statLogs = { innerHTML: '' };
@@ -35,6 +35,17 @@ function loadAppWithRender() {
   const connStatus = { className: '', removeAttribute() {}, setAttribute(name, value) { this[name] = value; }, title: '' };
   const hostText = { textContent: '' };
   const connProgress = { style: {} };
+  const toastClasses = new Set();
+  const toast = {
+    textContent: '',
+    style: {},
+    classList: {
+      add(value) { toastClasses.add(value); },
+      remove(value) { toastClasses.delete(value); },
+      contains(value) { return toastClasses.has(value); },
+    },
+    __classes: toastClasses,
+  };
   const elements = {
     'log-body': tbody,
     'log-thead': thead,
@@ -52,6 +63,7 @@ function loadAppWithRender() {
     'search': searchEl,
     'conn-status': connStatus,
     'conn-progress': connProgress,
+    'toast': toast,
   };
   App.dom.byId = (id) => elements[id] === undefined ? null : elements[id];
   App.dom.q = (selector) => selector === '.host-text' ? hostText : null;
@@ -68,13 +80,57 @@ function loadAppWithRender() {
       App.state.runtime.polling.pausedForExpansion = true;
     },
   };
-  return { App, tbody };
+  return { App, tbody, toast };
 }
 
 test('renderAllStatic does not eagerly render hidden query history', () => {
   const { App } = loadAppWithRender();
   App.render.renderAllStatic();
   assertEqual(App.__queryHistoryRendered || 0, 0);
+});
+
+test('toasts module supports error styling and durations', () => {
+  const { App, toast } = loadAppWithRender();
+  const timers = [];
+  App.__testContext.setTimeout = (callback, duration) => {
+    timers.push({ callback, duration });
+    return timers.length;
+  };
+  App.__testContext.clearTimeout = () => {};
+
+  App.toasts.show('Could not copy row');
+  assertEqual(toast.textContent, 'Could not copy row');
+  assertEqual(toast.classList.contains('show'), true);
+  assertEqual(toast.classList.contains('error'), false);
+  assertEqual(toast.style.color, 'var(--green, #7fd962)');
+  assertEqual(toast.style.borderColor, 'var(--green, #7fd962)');
+  assertEqual(timers[0].duration, 2000);
+
+  App.toasts.show('Config import failed', { kind: 'error' });
+  assertEqual(toast.textContent, 'Config import failed');
+  assertEqual(toast.classList.contains('show'), true);
+  assertEqual(toast.classList.contains('error'), true);
+  assertEqual(toast.style.color, 'var(--accent, #e8433a)');
+  assertEqual(toast.style.borderColor, 'var(--accent, #e8433a)');
+  assertEqual(timers[1].duration, 5000);
+
+  timers[1].callback();
+  assertEqual(toast.classList.contains('show'), false);
+  assertEqual(toast.classList.contains('error'), true);
+});
+
+test('toast CSS colors success green and errors red', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'site/styles/aerolog.css'), 'utf8');
+  assertEqual(/\.toast\s*\{[^}]*border:\s*1px\s+solid\s+var\(--green\);[^}]*color:\s*var\(--green\);/s.test(css), true);
+  assertEqual(/\.toast\.error\s*\{[^}]*border-color:\s*var\(--accent\);[^}]*color:\s*var\(--accent\);/s.test(css), true);
+  assertEqual(css.includes('var(--red)'), false);
+});
+
+test('index loads toasts after core and before state', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'site/index.html'), 'utf8');
+  const scripts = Array.from(html.matchAll(/<script src="\.\/js\/([^"]+)" defer><\/script>/g)).map((match) => match[1]);
+  assertEqual(scripts.indexOf('core.js') < scripts.indexOf('toasts.js'), true);
+  assertEqual(scripts.indexOf('toasts.js') < scripts.indexOf('state.js'), true);
 });
 
 test('renderLogs emits N rows when no rows are expanded', () => {

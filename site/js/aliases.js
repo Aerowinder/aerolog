@@ -15,7 +15,7 @@
     const aliases = App.validators.aliasesText(dom.byId('aliases-text').value);
     const duplicateFriendly = App.validators.duplicateFriendlyAlias(aliases);
     if (duplicateFriendly) {
-      App.utils.showAlert(`Friendly alias names must be unique. Duplicate: ${duplicateFriendly}`);
+      App.toasts.error(`Alias "${duplicateFriendly}" is used more than once`);
       return;
     }
     closeAliasesModal();

@@ -49,11 +49,11 @@
     const name = dom.byId('new-tab-name').value.trim();
     const hosts = App.validators.hostList(dom.byId('new-tab-hosts').value.split('\n'));
     if (!name) {
-      App.utils.showAlert('Tab name is required');
+      App.toasts.error('Enter a tab name');
       return;
     }
     if (!hosts.length) {
-      App.utils.showAlert('At least one hostname is required');
+      App.toasts.error('Add at least one hostname');
       return;
     }
     dom.byId('new-tab-name').value = '';
@@ -67,11 +67,11 @@
     const name = dom.byId('edit-tab-name').value.trim();
     const hosts = App.validators.hostList(dom.byId('edit-tab-hosts').value.split('\n'));
     if (!name) {
-      App.utils.showAlert('Tab name is required');
+      App.toasts.error('Enter a tab name');
       return;
     }
     if (!hosts.length) {
-      App.utils.showAlert('At least one hostname is required');
+      App.toasts.error('Add at least one hostname');
       return;
     }
     closeTabEdit();

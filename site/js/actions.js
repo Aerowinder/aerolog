@@ -66,7 +66,7 @@
   App.actions.applyCustomTimeRange = async function applyCustomTimeRange(range) {
     const customRange = App.validators.timecustom(range);
     if (!customRange.start || !customRange.end) {
-      App.utils.showAlert('Choose a valid start and end time.');
+      App.toasts.error('Choose a valid start and end time');
       return { started: false, reason: 'invalid_custom_time' };
     }
     App.persist.logview.timecustom(customRange);

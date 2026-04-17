@@ -141,6 +141,20 @@ test('duplicate friendly aliases are detected case-insensitively', () => {
   assertEqual(App.validators.duplicateFriendlyAlias(aliases), 'Router');
 });
 
+test('duplicate alias toast is rendered as an error', async () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'aliases.js']);
+  const calls = [];
+  App.dom.byId = (id) => id === 'aliases-text' ? { value: '10.0.0.5 = router\n10.0.0.6 = Router' } : null;
+  App.toasts = {
+    error(message) { calls.push({ kind: 'error', message }); },
+    success(message) { calls.push({ kind: 'success', message }); },
+  };
+  App.modals = { closeModal() {} };
+  App.actions = { saveAliases() { throw new Error('save should not run'); } };
+  await App.aliases.saveAliases();
+  assertDeepEqual(calls, [{ kind: 'error', message: 'Alias "Router" is used more than once' }]);
+});
+
 test('server URL normalization keeps display separate from request URL', () => {
   const App = loadApp();
   assertEqual(App.utils.displayServerUrl('logs-box:9428/'), 'logs-box:9428');
@@ -269,11 +283,11 @@ test('pagination caps the wide numbered range at fifteen pages', () => {
 });
 
 test('config export maps internal columns to compact export keys', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   App.persist.logview.colwidths({ widths: { _time: 240, hostname: 180, priority: 100, facility: 120, app_name: 140 } });
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertEqual(exported.settings_version, 100);
-  assertEqual(exported.aerolog_version, '1.00');
+  assertEqual(exported.aerolog_version, '1.01');
   assertEqual(exported.export_time, '2026-04-13T12:34:56.000Z');
   assertDeepEqual(exported.logview, {
     rowcount: '100',
@@ -284,7 +298,7 @@ test('config export maps internal columns to compact export keys', () => {
 });
 
 test('config export filename includes settings version and local timestamp', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   const filename = App.configIo.exportFilename(new Date('2026-04-15T22:25:33'));
   assertEqual(filename, 'aerolog-export-100-20260415222533.json');
 });
@@ -338,7 +352,10 @@ test('queryhist persist clears defaults missing from the new history', () => {
 test('persist factory catches localStorage write failures and reports them', () => {
   const App = loadApp();
   const calls = [];
-  App.render = { showToast(message) { calls.push(message); } };
+  App.toasts = {
+    error(message) { calls.push({ kind: 'error', message }); },
+    success(message) { calls.push({ kind: 'success', message }); },
+  };
   App.__testContext.localStorage.setItem = () => {
     throw new Error('quota exceeded');
   };
@@ -352,7 +369,7 @@ test('persist factory catches localStorage write failures and reports them', () 
   }
   assertEqual(value, '250');
   assertEqual(App.state.config.logview.rowcount, '250');
-  assertDeepEqual(calls, ['settings not saved']);
+  assertDeepEqual(calls, [{ kind: 'error', message: 'Settings could not be saved' }]);
 });
 
 test('config export includes custom time ranges', () => {
@@ -364,7 +381,7 @@ test('config export includes custom time ranges', () => {
         end: '2026-04-13T11:00:00.000Z',
       },
     }),
-  }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertEqual(exported.logview.timerange, 'custom');
   assertDeepEqual(exported.logview.timecustom, {
@@ -387,7 +404,7 @@ test('config export and import group settings and logview preferences', () => {
       timerange: '1y',
       colwidths: { widths: { _time: 210, hostname: 149, priority: 123, facility: 114, app_name: 237 } },
     }),
-  }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertDeepEqual(exported.settings, {
     server: 'logs.example:9428',
@@ -449,14 +466,14 @@ test('config export and import group settings and logview preferences', () => {
 });
 
 test('config export omits empty custom time range and empty default query', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertEqual(Object.prototype.hasOwnProperty.call(exported.logview, 'timecustom'), false);
   assertEqual(Object.prototype.hasOwnProperty.call(exported, 'querydef'), false);
 });
 
 test('config import applies compact column keys and query defaults', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   App.configIo.applyImportedConfig({
     settings: { theme: 'dark' },
     logview: {
@@ -475,7 +492,7 @@ test('config import applies compact column keys and query defaults', () => {
 });
 
 test('config import preserves valid custom time ranges and disables invalid custom ranges', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   App.configIo.applyImportedConfig({
     logview: {
       timerange: 'custom',
@@ -504,7 +521,7 @@ test('config import drops defaults that are missing from history', () => {
   const App = loadApp({
     aerolog_querydef: 'old',
     aerolog_queryhist: JSON.stringify([{ query: 'old', pinned: true }]),
-  }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   App.configIo.applyImportedConfig({
     querydef: 'missing',
     queryhist: [{ query: 'present', pinned: false }],
@@ -514,7 +531,7 @@ test('config import drops defaults that are missing from history', () => {
 });
 
 test('config import rejects pre-100 settings versions', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   let message = '';
   try {
     App.configIo.applyImportedConfig({ settings_version: 1 });
@@ -533,14 +550,70 @@ test('config import rejects pre-100 settings versions', () => {
 });
 
 test('config import accepts future settings versions for forward migration', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   // Version 999 is >= 100, so it should import without error
   const result = App.configIo.applyImportedConfig({ settings_version: 999, settings: { theme: 'dark' } });
   assertEqual(result.settings.theme, 'dark');
 });
 
+test('settingsMigration.migrate walks ordered steps and applies only matching ranges', () => {
+  const App = loadApp({}, ['core.js', 'settings_migration.js']);
+  const log = [];
+  App.settingsMigration.STEPS.push(
+    { fromVersion: 100, toVersion: 200, migrate(config) { log.push('100->200'); config.settings.theme = 'dark'; } },
+    { fromVersion: 200, toVersion: 300, migrate(config) { log.push('200->300'); config.settings.tabvis = { tabs: false }; } },
+  );
+  try {
+    const config = { settings: { theme: 'light' } };
+    const finalVersion = App.settingsMigration.migrate(config, 100);
+    assertEqual(finalVersion, 300);
+    assertDeepEqual(log, ['100->200', '200->300']);
+    assertEqual(config.settings.theme, 'dark');
+    assertEqual(config.settings.tabvis.tabs, false);
+
+    log.length = 0;
+    const midConfig = { settings: { theme: 'light' } };
+    const midVersion = App.settingsMigration.migrate(midConfig, 200);
+    assertEqual(midVersion, 300);
+    assertDeepEqual(log, ['200->300']);
+    assertEqual(midConfig.settings.theme, 'light');
+
+    log.length = 0;
+    const futureConfig = { settings: {} };
+    const futureVersion = App.settingsMigration.migrate(futureConfig, 400);
+    assertEqual(futureVersion, 400);
+    assertDeepEqual(log, []);
+  } finally {
+    App.settingsMigration.STEPS.length = 0;
+  }
+});
+
+test('settingsMigration.migrate runs from config_io on a legacy version via a registered step', () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
+  App.settingsMigration.STEPS.push({
+    fromVersion: 100,
+    toVersion: 200,
+    migrate(config) {
+      // Simulate a hypothetical rename: legacy `settings.colorTheme` → `settings.theme`.
+      if (config.settings && config.settings.colorTheme && !config.settings.theme) {
+        config.settings.theme = config.settings.colorTheme;
+        delete config.settings.colorTheme;
+      }
+    },
+  });
+  try {
+    const result = App.configIo.applyImportedConfig({
+      settings_version: 100,
+      settings: { colorTheme: 'dark' },
+    });
+    assertEqual(result.settings.theme, 'dark');
+  } finally {
+    App.settingsMigration.STEPS.length = 0;
+  }
+});
+
 test('internal config, localStorage groups, and export JSON shapes stay in sync', () => {
-  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'config_io.js']);
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   const defaultKeys = Object.keys(App.DEFAULTS).sort();
   const storageKeys = Object.keys(App.STORAGE_KEYS).sort();
   assertDeepEqual(defaultKeys, storageKeys);
@@ -625,4 +698,3 @@ test('derive.connectionView produces the right pill state for every connection/a
   setCanAutoPoll(false);
   assertEqual(App.derive.connectionView().state, 'paused');
 });
-

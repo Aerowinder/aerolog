@@ -75,8 +75,7 @@
     if (!Number.isFinite(importVersion) || importVersion < 100) {
       throw new Error(`Unsupported settings version: ${config.settings_version}`);
     }
-    // Future migrations go here, ordered by version:
-    // if (importVersion < 200) { /* migrate 100 → 200 shape */ }
+    App.settingsMigration.migrate(config, importVersion);
     const settings = config.settings && typeof config.settings === 'object' && !Array.isArray(config.settings) ? config.settings : {};
     const logview = config.logview && typeof config.logview === 'object' && !Array.isArray(config.logview) ? config.logview : {};
 

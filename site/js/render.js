@@ -82,14 +82,6 @@
     if (bar) bar.style.display = App.derive.showProgressBar() ? '' : 'none';
   }
 
-  function showToast(text) {
-    const toast = dom.byId('toast');
-    toast.textContent = text;
-    toast.classList.add('show');
-    clearTimeout(showToast.timerId);
-    showToast.timerId = setTimeout(() => toast.classList.remove('show'), 1400);
-  }
-
   function renderAllStatic() {
     dom.byId('version-text').textContent = App.VERSION;
     document.documentElement.setAttribute('data-message-lines', App.state.config.settings.logtable.msglines);
@@ -116,7 +108,6 @@
     renderError,
     renderConnectionPill,
     renderAllStatic,
-    showToast,
   };
 
   App.renderInternals = {
