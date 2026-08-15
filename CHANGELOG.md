@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1
+- Added field fallback option in the settings. This allows you to use a substitute field if the parent field is missing. For instance, if a device is sending an empty hostname, replace the empty hostname with app_name. Aliases, tabs, host searches, click-to-filter, and heartbeats use the same fallback identity.
+- Changed config export filenames to use the hostname of the Aerolog site being visited, while retaining the previous behavior of `aerolog-export` for locally-hosted sites (ie. run directly from the Git repo).
+
 ## 1.01
 - Error toasts now use clearer wording, red styling, and stay visible longer.
 - Toasts now stay visible a little longer in general.

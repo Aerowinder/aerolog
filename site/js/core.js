@@ -1,7 +1,7 @@
 (function () {
   const App = window.Aerolog = window.Aerolog || {};
 
-  App.VERSION = '1.01';
+  App.VERSION = '1.1';
 
   App.COLUMN_DEFS = {
     '_time':    { label: 'Timestamp', width: 220, exportKey: 'time',     className: 'ts'   },
@@ -27,6 +27,7 @@
       theme: 'system',
       tabvis: { tabs: true, aliases: true, heartbeats: true },
       logtable: { msglines: '3', expand: true, copy: true, filter: true },
+      fallback: { hostname: { enabled: true, field: 'app_name' } },
     },
     logview: {
       rowcount: '100',
@@ -208,6 +209,21 @@
       return /^[1-5]$/.test(normalized) ? normalized : App.DEFAULTS.settings.logtable.msglines;
     },
     logtableFlag: boolFlag,
+    hostnameFallbackEnabled: boolFlag,
+    hostnameFallbackField(value) {
+      return value === 'app_name' ? value : App.DEFAULTS.settings.fallback.hostname.field;
+    },
+    hostnameFallback(value) {
+      const src = (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+      return {
+        enabled: src.enabled !== false,
+        field: App.validators.hostnameFallbackField(src.field),
+      };
+    },
+    fallback(value) {
+      const src = (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+      return { hostname: App.validators.hostnameFallback(src.hostname) };
+    },
     logtable(value) {
       const d = App.DEFAULTS.settings.logtable;
       if (!value || typeof value !== 'object' || Array.isArray(value)) return { ...d };
@@ -259,6 +275,7 @@
         theme: App.validators.theme(src.theme),
         tabvis: App.validators.tabvis(src.tabvis),
         logtable: App.validators.logtable(src.logtable),
+        fallback: App.validators.fallback(src.fallback),
       };
     },
     logview(value) {

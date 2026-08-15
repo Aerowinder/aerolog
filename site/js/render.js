@@ -26,6 +26,18 @@
     });
   }
 
+  function renderHostnameFallbackControls() {
+    const fallback = App.state.config.settings.fallback.hostname;
+    const enabled = fallback.enabled !== false;
+    dom.qa('.hostname-fallback-toggle').forEach((input) => {
+      input.checked = enabled;
+    });
+    dom.qa('.hostname-fallback-choice').forEach((input) => {
+      input.checked = input.value === fallback.field;
+      input.disabled = !enabled;
+    });
+  }
+
   function renderToolbarState() {
     dom.byId('page-size').value = App.state.config.logview.rowcount;
     dom.byId('poll-interval').value = App.derive.effectivePollInterval();
@@ -89,6 +101,7 @@
     renderThemeButtons();
     renderMessageLineSelect();
     renderRowActionToggles();
+    renderHostnameFallbackControls();
     App.render.renderTableHeader();
     App.render.renderTabs();
     App.render.renderPagination();
@@ -102,6 +115,7 @@
     renderToolToggles,
     renderMessageLineSelect,
     renderRowActionToggles,
+    renderHostnameFallbackControls,
     renderToolbarState,
     renderStats,
     renderResponseTime,

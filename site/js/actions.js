@@ -133,6 +133,14 @@
     return App.state.config.settings.logtable;
   };
 
+  App.actions.setHostnameFallback = async function setHostnameFallback(enabled) {
+    const next = App.persist.settings.fallback.hostname.enabled(enabled);
+    App.state.runtime.currentPage = 1;
+    App.render.renderHostnameFallbackControls();
+    App.render.renderLogs();
+    return App.api.dispatchRefresh('settings');
+  };
+
   App.actions.activateTab = async function activateTab(tabId) {
     App.state.runtime.activeTabId = tabId;
     App.state.runtime.currentPage = 1;

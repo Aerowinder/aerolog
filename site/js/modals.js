@@ -33,6 +33,7 @@
     App.render.renderToolToggles();
     App.render.renderMessageLineSelect();
     App.render.renderRowActionToggles();
+    if (App.render.renderHostnameFallbackControls) App.render.renderHostnameFallbackControls();
     openModal('settings-modal');
   }
 

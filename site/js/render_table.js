@@ -7,7 +7,7 @@
   }
 
   function renderHostname(log) {
-    return utils.escapeHtml(App.query.displayHostname(log.hostname || '-'));
+    return utils.escapeHtml(App.query.displayHostname(App.query.rawHostname(log)));
   }
 
   function renderAppName(log) {
@@ -41,7 +41,7 @@
     },
     hostname: {
       render: renderHostname,
-      copy(log) { return App.query.displayHostname(log.hostname || '-'); },
+      copy(log) { return App.query.displayHostname(App.query.rawHostname(log)); },
     },
     priority: {
       render: renderPriority,

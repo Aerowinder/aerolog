@@ -57,6 +57,12 @@
       });
     });
 
+    dom.qa('.hostname-fallback-toggle').forEach((input) => {
+      input.addEventListener('change', async () => {
+        await App.actions.setHostnameFallback(input.checked);
+      });
+    });
+
     dom.byId('import-file').addEventListener('change', (event) => App.modals.importConfig(event));
     dom.byId('server-url').addEventListener('blur', () => App.modals.applyServerFromSettings());
 

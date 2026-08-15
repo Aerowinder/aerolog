@@ -96,6 +96,7 @@ Click the gear icon in the top-right corner of the page.
 - **Theme**: light, dark, or system
 - **Tab Visibility**: toggle the built-in tool buttons for Tabs, Aliases, and Heartbeats
 - **Log Table**: choose message preview lines and toggle row expand, row copy, and click-to-filter controls
+- **Field Fallback**: when a log has no `hostname`, use its `app_name` as its host identity; enabled by default and can be turned off
 - **Config Management**: export your tabs, aliases, query history, log table layout, and other UI settings to a JSON file you can import elsewhere, or restore them from backup
 - **GitHub link**: the Settings modal header includes a direct link to the project page
 
@@ -155,6 +156,12 @@ Aliases apply in several places:
 Friendly alias names must be unique. Aerolog does not allow multiple raw systems to share the same friendly alias.
 
 So `host:router-01` can resolve to the raw device name or IP that actually exists in the logs.
+
+### Field Fallback
+
+Some devices send logs without a usable `hostname`. **Field Fallback** is enabled by default and uses `app_name` as the host identity only for records whose `hostname` is empty. This lets the normal alias system, tabs, click-to-filter, host searches, and Heartbeats work for devices such as an RMCARD205 that place their identity in `app_name`.
+
+Turn off the **Hostname** checkbox in Settings → **Field Fallback** if `app_name` is not a reliable device identity for your log sources.
 
 ### Query History
 
@@ -344,7 +351,7 @@ Aerolog stores its UI state in the browser using localStorage. That includes thi
 - custom time range
 - toolbar preferences
 
-Config export/import groups Settings modal choices under `settings`, with table-behavior choices under `settings.logtable`; the log toolbar and column-width choices live under `logview`. Tabs, aliases, and query history remain separate export entries.
+Config export/import groups Settings modal choices under `settings`, with table-behavior choices under `settings.logtable` and hostname fallback under `settings.fallback.hostname` (`enabled` and `field`); the log toolbar and column-width choices live under `logview`. Tabs, aliases, and query history remain separate export entries. Export filenames use the hostname of the Aerolog site you are visiting, followed by the settings version and local export timestamp.
 
 Because of that, a fresh browser or machine will not have your setup unless you import a previously exported config JSON.
 

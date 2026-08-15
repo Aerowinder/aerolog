@@ -133,6 +133,17 @@ test('saveServerSettings ignores unchanged server text', async () => {
   assertDeepEqual(calls, []);
 });
 
+test('hostname fallback setting persists, refreshes, and resets to page one', async () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'actions.js']);
+  const calls = installActionStubs(App);
+  App.state.runtime.currentPage = 3;
+  await App.actions.setHostnameFallback(false);
+  assertEqual(App.state.config.settings.fallback.hostname.enabled, false);
+  assertEqual(JSON.parse(App.__testContext.localStorage.getItem('aerolog_settings')).fallback.hostname.enabled, false);
+  assertEqual(App.state.runtime.currentPage, 1);
+  assertDeepEqual(calls, ['renderHostnameFallbackControls', 'renderLogs', 'dispatchRefresh:settings']);
+});
+
 test('toggleToolTab action persists tool visibility and rerenders tools', () => {
   const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'actions.js']);
   const calls = installActionStubs(App);

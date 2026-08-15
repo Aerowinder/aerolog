@@ -203,6 +203,12 @@
         copy: makeSetter('settings.logtable.copy', 'logtableFlag'),
         filter: makeSetter('settings.logtable.filter', 'logtableFlag'),
       },
+      fallback: {
+        hostname: {
+          enabled: makeSetter('settings.fallback.hostname.enabled', 'hostnameFallbackEnabled'),
+          field: makeSetter('settings.fallback.hostname.field', 'hostnameFallbackField'),
+        },
+      },
     },
     logview: {
       rowcount: makeSetter('logview.rowcount', 'rowcount'),

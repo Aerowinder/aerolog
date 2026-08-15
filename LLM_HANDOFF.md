@@ -46,7 +46,7 @@ Do not add or preserve "just in case" compatibility wrappers, aliases, or fallba
 - The user may provide any of these separately when they want them updated.
 
 ### Packaging
-- Deliver a ZIP unless the user explicitly asks for loose files.
+- Do not create or deliver a ZIP unless the user explicitly asks for one. Work directly in the repository by default.
 - ZIPs contain runtime/project files and proper folder structure only.
 - Do **not** include `README.md`, `LLM_HANDOFF.md`, or `CHANGELOG.md` in a ZIP unless explicitly asked.
 - Do **not** scaffold empty `assets/` or `assets/icons/` directories.
@@ -66,7 +66,7 @@ Aerolog uses semantic versioning starting at `1.00`. Prior builds used caldate v
 - `App.SETTINGS_VERSION` in `core.js` — integer checked during config import; mismatched versions are rejected
 - `package.json` `version` field — kept in sync with `App.VERSION`
 
-`SETTINGS_VERSION` follows the version number the change was made on (e.g. version `1.00` → settings version `100`). Bump it whenever the config export/import shape changes so old exports are rejected instead of silently applying the wrong structure.
+`SETTINGS_VERSION` is bumped only for incompatible config changes that need migration. Additive settings with validator-backed defaults may keep the existing settings version, so older exports gain the new default safely.
 
 ---
 
@@ -187,7 +187,7 @@ Expected behavior:
 - explicit `host:~` / `hostname:~` → user-supplied regex, pass through
 - aliased host wildcard matching must work
 - friendly alias exact lookup is case-sensitive; do not add a lowercased reverse-alias fallback
-- exact host clauses must use real LogsQL exact syntax: `hostname:="value"` — **not** `hostname:"value"`
+- exact hostname legs must use real LogsQL exact syntax: `hostname:="value"` — **not** `hostname:"value"`. When hostname fallback is enabled, the shared matcher also adds an `app_name` exact leg guarded by `hostname:""`.
 
 ### Custom time range
 - `logview.timerange` (inside `aerolog_logview`) stores whether `custom` is active.
@@ -358,17 +358,17 @@ Query history dropdown content is rendered lazily when opened or after history m
 ## 12. Config and persistence
 
 ### Export/import shape
-Settings modal options group under `settings` with compact nested keys `server`, `theme`, `tabvis`, `logtable`. `tabvis` remains its own object. `settings.logtable` contains `msglines`, `expand`, `copy`, `filter`. Log toolbar and column-width options group under `logview` with `rowcount`, `pollint`, `timerange`, `timecustom`, `colwidths`. Tabs, aliases, query history, and query default remain top-level compact keys.
+Settings modal options group under `settings` with compact nested keys `server`, `theme`, `tabvis`, `logtable`, `fallback`. `tabvis` remains its own object. `settings.logtable` contains `msglines`, `expand`, `copy`, `filter`. `settings.fallback.hostname` is `{ enabled: true, field: 'app_name' }` by default and uses that field only when the real `hostname` field is empty. Log toolbar and column-width options group under `logview` with `rowcount`, `pollint`, `timerange`, `timecustom`, `colwidths`. Tabs, aliases, query history, and query default remain top-level compact keys.
 
 Do not fold alias or query-history workflows back into `modals.js`.
 
 ### Config export filename
-`aerolog-export-<SETTINGS_VERSION>-YYYYMMDDHHMMSS.json` using local browser time. The settings version in the filename lets the user see at a glance which schema a backup was exported from.
+`<site-hostname>-<SETTINGS_VERSION>-YYYYMMDDHHMMSS.json` using local browser time, where the site hostname comes from `window.location.hostname`. If Aerolog is opened without a hostname, fall back to `aerolog-export`. The settings version in the filename lets the user see at a glance which schema a backup was exported from.
 
 ### localStorage keys
 Six grouped JSON blobs that mirror the export/import top-level keys 1:1:
 
-- `aerolog_settings` — `{ server, theme, tabvis, logtable }`
+- `aerolog_settings` — `{ server, theme, tabvis, logtable, fallback }`
 - `aerolog_logview` — `{ rowcount, pollint, timerange, timecustom, colwidths }`
 - `aerolog_aliases` — `{ [rawHost]: friendly }`
 - `aerolog_tabs` — `[{ id, name, hosts }]`

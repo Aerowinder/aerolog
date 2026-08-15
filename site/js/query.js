@@ -146,17 +146,30 @@
   }
 
   function buildExactHostnameClause(value) {
-    return `hostname:=${utils.quoteLogsQlValue(resolveExactHost(value))}`;
+    return buildHostMatchClause(resolveExactHost(value), ':=');
+  }
+
+  function hostnameFallbackField() {
+    const fallback = App.state.config.settings.fallback.hostname;
+    return fallback && fallback.enabled !== false ? fallback.field : '';
+  }
+
+  function buildHostMatchClause(value, operator) {
+    const hostnameClause = `hostname${operator}${utils.quoteLogsQlValue(value)}`;
+    const fallbackField = hostnameFallbackField();
+    if (!fallbackField) return hostnameClause;
+    const fallbackClause = `${fallbackField}${operator}${utils.quoteLogsQlValue(value)}`;
+    return `(${hostnameClause} OR (hostname:"" AND ${fallbackClause}))`;
   }
 
   function compileHostClause(value, operator = ':') {
     const trimmed = String(value || '').trim();
     if (!trimmed) return '';
     if (operator === ':=') return buildExactHostnameClause(trimmed);
-    if (operator === ':~') return `hostname:~${utils.quoteLogsQlValue(trimmed)}`;
+    if (operator === ':~') return buildHostMatchClause(trimmed, ':~');
     if (!utils.hasWildcard(trimmed)) return buildExactHostnameClause(trimmed);
 
-    const clauses = [`hostname:~${utils.quoteLogsQlValue(utils.wildcardToRegex(trimmed))}`];
+    const clauses = [buildHostMatchClause(utils.wildcardToRegex(trimmed), ':~')];
     for (const raw of getAliasWildcardMatches(trimmed)) {
       const exactClause = buildExactHostnameClause(raw);
       if (!clauses.includes(exactClause)) clauses.push(exactClause);
@@ -290,7 +303,22 @@
       return `${buildFilterClause()} | stats count() as c`;
     },
     buildHeartbeatsQuery() {
-      return `${buildTimeFilterClause()} hostname:* | stats by (hostname) count() as messages, max(_time) as last_seen | sort by (last_seen) desc`;
+      const timeFilter = buildTimeFilterClause();
+      const fallbackField = hostnameFallbackField();
+      if (!fallbackField) {
+        return `${timeFilter} hostname:* | stats by (hostname) count() as messages, max(_time) as last_seen | sort by (last_seen) desc`;
+      }
+      return `${timeFilter} (hostname:* OR ${fallbackField}:*) | coalesce(hostname, ${fallbackField}) as hostname | stats by (hostname) count() as messages, max(_time) as last_seen | sort by (last_seen) desc`;
+    },
+    rawHostname(log) {
+      const hostname = String(log && log.hostname || '').trim();
+      if (hostname) return hostname;
+      const fallbackField = hostnameFallbackField();
+      if (fallbackField) {
+        const fallback = String(log && log[fallbackField] || '').trim();
+        if (fallback) return fallback;
+      }
+      return '-';
     },
     displayHostname(hostname) {
       return Object.prototype.hasOwnProperty.call(App.state.config.aliases, hostname)

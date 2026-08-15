@@ -35,9 +35,24 @@ test('host exact and wildcard matching uses aliases', () => {
       '192.168.1.50': 'firewall',
     }),
   });
-  assertEqual(App.query.rewriteQuery('host:router-01'), 'hostname:="10.0.0.5"');
-  assertEqual(App.query.rewriteQuery('hostname:router-*'), '(hostname:~"^router-.*$" OR hostname:="10.0.0.5")');
-  assertEqual(App.query.rewriteQuery('host:~router-[0-9]+'), 'hostname:~"router-[0-9]+"');
+  assertEqual(App.query.rewriteQuery('host:router-01'), '(hostname:="10.0.0.5" OR (hostname:"" AND app_name:="10.0.0.5"))');
+  assertEqual(App.query.rewriteQuery('hostname:router-*'), '((hostname:~"^router-.*$" OR (hostname:"" AND app_name:~"^router-.*$")) OR (hostname:="10.0.0.5" OR (hostname:"" AND app_name:="10.0.0.5")))');
+  assertEqual(App.query.rewriteQuery('host:~router-[0-9]+'), '(hostname:~"router-[0-9]+" OR (hostname:"" AND app_name:~"router-[0-9]+"))');
+});
+
+test('hostname fallback uses app_name only when hostname is empty and can be disabled', () => {
+  const App = loadApp({
+    aerolog_aliases: JSON.stringify({ 'HOME-UPS(192.168.10.6)': 'home-ups' }),
+  });
+  const fallbackLog = { app_name: 'HOME-UPS(192.168.10.6)' };
+  assertEqual(App.query.rawHostname(fallbackLog), 'HOME-UPS(192.168.10.6)');
+  assertEqual(App.query.displayHostname(App.query.rawHostname(fallbackLog)), 'home-ups');
+  assertEqual(App.query.rawHostname({ hostname: 'router-01', app_name: 'sshd' }), 'router-01');
+  assertEqual(App.query.rewriteQuery('host:home-ups'), '(hostname:="HOME-UPS(192.168.10.6)" OR (hostname:"" AND app_name:="HOME-UPS(192.168.10.6)"))');
+
+  App.persist.settings.fallback.hostname.enabled(false);
+  assertEqual(App.query.rawHostname(fallbackLog), '-');
+  assertEqual(App.query.rewriteQuery('host:home-ups'), 'hostname:="HOME-UPS(192.168.10.6)"');
 });
 
 test('quoted string bodies are not searched for friendly fields', () => {
@@ -72,12 +87,21 @@ test('field filters build readable clauses for structured table cells', () => {
 
   const target = (row, column) => ({ dataset: { filterRow: String(row), filterColumn: column } });
   assertEqual(App.fieldFilters.filterFromTarget(target(0, 'hostname')).clause, 'host:"router-01"');
-  assertEqual(App.query.rewriteQuery(App.fieldFilters.filterFromTarget(target(0, 'hostname')).clause), 'hostname:="10.0.0.5"');
+  assertEqual(App.query.rewriteQuery(App.fieldFilters.filterFromTarget(target(0, 'hostname')).clause), '(hostname:="10.0.0.5" OR (hostname:"" AND app_name:="10.0.0.5"))');
   assertEqual(App.fieldFilters.filterFromTarget(target(0, 'priority')).clause, 'sev:3');
   assertEqual(App.fieldFilters.filterFromTarget(target(0, 'facility')).clause, 'fac:"auth"');
   assertEqual(App.fieldFilters.filterFromTarget(target(1, 'facility')).clause, 'facility_num:10');
   assertEqual(App.fieldFilters.filterFromTarget(target(1, 'app_name')).clause, 'app:"cron job"');
   assertEqual(App.query.rewriteQuery(App.fieldFilters.filterFromTarget(target(1, 'app_name')).clause), 'app_name:="cron job"');
+});
+
+test('hostname click-to-filter uses the fallback identity and alias', () => {
+  const App = loadApp({
+    aerolog_aliases: JSON.stringify({ 'HOME-UPS(192.168.10.6)': 'home-ups' }),
+  }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'field_filters.js']);
+  App.state.runtime.currentLogs = [{ app_name: 'HOME-UPS(192.168.10.6)' }];
+  const target = { dataset: { filterRow: '0', filterColumn: 'hostname' } };
+  assertEqual(App.fieldFilters.filterFromTarget(target).clause, 'host:"home-ups"');
 });
 
 test('field filters skip time and message but include safe detail fields', () => {
@@ -163,4 +187,3 @@ test('active tab filters the query by its host list with alias resolution', () =
   assertEqual(clause.includes('hostname:="10.0.0.5"'), true);
   assertEqual(clause.includes('hostname:~"^switch-.*$"'), true);
 });
-

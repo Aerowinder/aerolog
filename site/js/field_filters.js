@@ -31,7 +31,7 @@
     if (!log || columnId === '_time' || columnId === '_msg') return null;
 
     if (columnId === 'hostname') {
-      const value = fieldValue(App.query.displayHostname(log.hostname));
+      const value = fieldValue(App.query.displayHostname(App.query.rawHostname(log)));
       return value ? { field: 'host', value, clause: friendlyClause('host', value) } : null;
     }
 

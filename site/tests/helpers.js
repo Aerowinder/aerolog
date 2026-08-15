@@ -120,6 +120,7 @@ function installActionStubs(App) {
     renderToolToggles() { calls.push('renderToolToggles'); },
     renderMessageLineSelect() { calls.push('renderMessageLineSelect'); },
     renderRowActionToggles() { calls.push('renderRowActionToggles'); },
+    renderHostnameFallbackControls() { calls.push('renderHostnameFallbackControls'); },
   };
   App.api = {
     dispatchRefresh(cause) {

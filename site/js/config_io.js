@@ -11,7 +11,9 @@
       pad(date.getMinutes()),
       pad(date.getSeconds()),
     ].join('');
-    return `aerolog-export-${App.SETTINGS_VERSION}-${stamp}.json`;
+    const hostname = window.location && window.location.hostname;
+    const prefix = hostname || 'aerolog-export';
+    return `${prefix}-${App.SETTINGS_VERSION}-${stamp}.json`;
   }
 
   function exportColumnWidths(colwidths = App.state.config.logview.colwidths) {
@@ -57,6 +59,7 @@
         theme: config.settings.theme,
         tabvis: { ...config.settings.tabvis },
         logtable: { ...config.settings.logtable },
+        fallback: { ...config.settings.fallback },
       },
       logview,
       aliases: { ...config.aliases },
@@ -89,6 +92,7 @@
     if (settings.theme != null) { settingsCfg.theme = App.validators.theme(settings.theme); settingsDirty = true; themeApplied = settingsCfg.theme; }
     if (settings.tabvis != null) { settingsCfg.tabvis = App.validators.tabvis(settings.tabvis); settingsDirty = true; }
     if (settings.logtable != null) { settingsCfg.logtable = App.validators.logtable(settings.logtable); settingsDirty = true; }
+    if (settings.fallback != null) { settingsCfg.fallback = App.validators.fallback(settings.fallback); settingsDirty = true; }
     if (settingsDirty) App.state.writeGroup('settings');
     if (themeApplied) App.utils.applyDocumentTheme(themeApplied, true);
 

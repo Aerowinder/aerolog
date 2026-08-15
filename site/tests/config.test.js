@@ -174,7 +174,7 @@ test('custom time range compiles to an absolute LogsQL time range', () => {
     }),
   });
   assertEqual(App.query.buildTimeFilterClause(), '_time:[2026-04-13T10:00:00Z, 2026-04-13T11:30:00Z)');
-  assertEqual(App.query.buildHeartbeatsQuery(), '_time:[2026-04-13T10:00:00Z, 2026-04-13T11:30:00Z) hostname:* | stats by (hostname) count() as messages, max(_time) as last_seen | sort by (last_seen) desc');
+  assertEqual(App.query.buildHeartbeatsQuery(), '_time:[2026-04-13T10:00:00Z, 2026-04-13T11:30:00Z) (hostname:* OR app_name:*) | coalesce(hostname, app_name) as hostname | stats by (hostname) count() as messages, max(_time) as last_seen | sort by (last_seen) desc');
 });
 
 test('invalid custom time range falls back to the default time filter', () => {
@@ -287,7 +287,7 @@ test('config export maps internal columns to compact export keys', () => {
   App.persist.logview.colwidths({ widths: { _time: 240, hostname: 180, priority: 100, facility: 120, app_name: 140 } });
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertEqual(exported.settings_version, 100);
-  assertEqual(exported.aerolog_version, '1.01');
+  assertEqual(exported.aerolog_version, '1.1');
   assertEqual(exported.export_time, '2026-04-13T12:34:56.000Z');
   assertDeepEqual(exported.logview, {
     rowcount: '100',
@@ -299,8 +299,9 @@ test('config export maps internal columns to compact export keys', () => {
 
 test('config export filename includes settings version and local timestamp', () => {
   const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
+  App.__testContext.window.location = { hostname: 'aerolog.site.com' };
   const filename = App.configIo.exportFilename(new Date('2026-04-15T22:25:33'));
-  assertEqual(filename, 'aerolog-export-100-20260415222533.json');
+  assertEqual(filename, 'aerolog.site.com-100-20260415222533.json');
 });
 
 test('nested persist writes mutate config and serialize the owning group to localStorage', () => {
@@ -416,6 +417,7 @@ test('config export and import group settings and logview preferences', () => {
       copy: true,
       filter: false,
     },
+    fallback: { hostname: { enabled: true, field: 'app_name' } },
   });
   assertDeepEqual(exported.logview, {
     rowcount: '1000',
@@ -433,6 +435,7 @@ test('config export and import group settings and logview preferences', () => {
       server: 'imported.example:9428/',
       theme: 'system',
       tabvis: { tabs: true, aliases: false, heartbeats: true },
+      fallback: { hostname: { enabled: false, field: 'app_name' } },
       logtable: {
         msglines: '2',
         expand: true,
@@ -450,6 +453,7 @@ test('config export and import group settings and logview preferences', () => {
   assertEqual(App.state.config.settings.server, 'imported.example:9428');
   assertEqual(App.state.config.settings.theme, 'system');
   assertDeepEqual(App.state.config.settings.tabvis, { tabs: true, aliases: false, heartbeats: true });
+  assertDeepEqual(App.state.config.settings.fallback, { hostname: { enabled: false, field: 'app_name' } });
   assertEqual(App.state.config.settings.logtable.msglines, '2');
   assertDeepEqual(App.state.config.settings.logtable, { msglines: '2', expand: true, copy: false, filter: false });
   assertEqual(App.state.config.logview.rowcount, '250');
@@ -461,6 +465,7 @@ test('config export and import group settings and logview preferences', () => {
   assertEqual(writtenSettings.server, 'imported.example:9428');
   assertEqual(writtenSettings.theme, 'system');
   assertDeepEqual(writtenSettings.tabvis, { tabs: true, aliases: false, heartbeats: true });
+  assertDeepEqual(writtenSettings.fallback, { hostname: { enabled: false, field: 'app_name' } });
   assertEqual(writtenSettings.logtable.msglines, '2');
   assertDeepEqual(writtenSettings.logtable, { msglines: '2', expand: true, copy: false, filter: false });
 });
@@ -636,10 +641,11 @@ test('internal config, localStorage groups, and export JSON shapes stay in sync'
     assertEqual(Object.prototype.hasOwnProperty.call(exported, key), true, `export missing canonical group ${key}`);
   }
 
-  assertDeepEqual(Object.keys(App.DEFAULTS.settings).sort(), ['logtable', 'server', 'tabvis', 'theme']);
+  assertDeepEqual(Object.keys(App.DEFAULTS.settings).sort(), ['fallback', 'logtable', 'server', 'tabvis', 'theme']);
   assertDeepEqual(Object.keys(App.DEFAULTS.logview).sort(), ['colwidths', 'pollint', 'rowcount', 'timecustom', 'timerange']);
   assertDeepEqual(Object.keys(App.DEFAULTS.settings.tabvis).sort(), ['aliases', 'heartbeats', 'tabs']);
   assertDeepEqual(Object.keys(App.DEFAULTS.settings.logtable).sort(), ['copy', 'expand', 'filter', 'msglines']);
+  assertDeepEqual(App.DEFAULTS.settings.fallback, { hostname: { enabled: true, field: 'app_name' } });
 });
 
 test('pre-paint theme script reads theme from aerolog_settings and falls back to system', () => {
