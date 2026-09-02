@@ -80,7 +80,7 @@
   }
 
   function renderStats() {
-    dom.byId('stat-logs').innerHTML = `<b>${Number(App.state.runtime.totalCount).toLocaleString()}</b> available logs`;
+    dom.byId('stat-logs').innerHTML = `<b>${Number(App.state.runtime.totalCount).toLocaleString()}</b> Logs`;
   }
 
   function responseTimeText() {
@@ -98,7 +98,7 @@
   function renderResponseTime() {
     const el = dom.byId('stat-resp');
     const text = responseTimeText();
-    el.innerHTML = text === '--' ? '<b>--</b> response time' : `<b>${text}</b> response time`;
+    el.innerHTML = `<b>${text}</b> API`;
     if (App.render.renderPagerMeta && App.render.pageButtonCount) {
       App.render.renderPagerMeta(App.render.pageButtonCount());
     }
@@ -107,7 +107,7 @@
   function renderRenderTime() {
     const el = dom.byId('stat-render');
     const text = renderTimeText();
-    el.innerHTML = text === '--' ? '<b>--</b> render time' : `<b>${text}</b> render time`;
+    el.innerHTML = `<b>${text}</b> UI`;
   }
 
   function renderError(message) {

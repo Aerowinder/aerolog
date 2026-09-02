@@ -253,6 +253,9 @@ Response time updates after every successful refresh, including settings-driven 
 - Error detail goes in the tooltip/title, not the main label.
 - A rejected HTTP 400 query is not a connection failure; preserve the active-poll green state while the query feedback is shown elsewhere.
 
+### Header layout
+Keep app identity on the left, compact centered metrics, and connection status plus Settings on the right. Metrics use a two-row grid inside the existing header height: Logs first, then API and UI. Do not make them a separate header row, so variable server names cannot displace them. Desktop server text stays on one line and ellipsizes only beyond the combined Poll, Rows, and Last control span, after reserving space for Settings and its gap. Mobile keeps a compact single-line pill. The header layout remains active refinement work; preserve this alignment rule while continuing it.
+
 ---
 
 ## 9. UI rules

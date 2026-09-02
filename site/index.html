@@ -23,26 +23,30 @@
 <body>
 
 <div class="header">
+  <div class="header-main">
   <div class="header-left">
     <div class="logo">Aerolog <span class="version" id="version-text"></span></div>
   </div>
-  <span class="conn-status" id="conn-status" role="status" aria-live="polite">
-    <span class="dot"></span>
-    <span class="host-text">not connected</span>
-    <span class="conn-progress" id="conn-progress"></span>
-  </span>
   <div class="header-right">
-    <div class="stats-stack">
-      <span id="stat-logs"><b>--</b> available logs</span>
-      <span id="stat-resp"><b>--</b> response time</span>
-      <span id="stat-render"><b>--</b> render time</span>
-    </div>
+    <span class="conn-status" id="conn-status" role="status" aria-live="polite">
+      <span class="dot"></span>
+      <span class="host-text">not connected</span>
+      <span class="conn-progress" id="conn-progress"></span>
+    </span>
     <button class="header-btn" data-action="open-settings" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
     </button>
+  </div>
+  </div>
+  <div class="header-metrics">
+    <div class="stats-stack">
+      <span id="stat-logs"><b>--</b> Logs</span>
+      <span id="stat-resp"><b>--</b> API</span>
+      <span id="stat-render"><b>--</b> UI</span>
+    </div>
   </div>
 </div>
 

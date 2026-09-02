@@ -17,6 +17,29 @@ test('aerolog.css uses only the 1000px responsive breakpoint', () => {
   }
 });
 
+test('desktop server pill ellipsizes at the toolbar control span', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'site/styles/aerolog.css'), 'utf8');
+  const pill = Array.from(css.matchAll(/\.conn-status\s*\{([^}]*)\}/g))
+    .find((match) => match[1].includes('130px + 130px + 145px'));
+  if (!pill) throw new Error('conn-status rule not found');
+  const rule = pill[1];
+  assertEqual(/white-space:\s*nowrap;/.test(rule), true);
+  assertEqual(/overflow:\s*hidden;/.test(rule), true);
+  assertEqual(/text-overflow:\s*ellipsis;/.test(rule), true);
+  assertEqual(/max-width:\s*calc\(130px \+ 130px \+ 145px \+ 1\.2rem - var\(--ctl-h\) - 1rem\);/.test(rule), true);
+});
+
+test('header metrics use a compact Logs then API/UI grid', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'site/styles/aerolog.css'), 'utf8');
+  const stats = css.match(/\.stats-stack\s*\{([^}]*)\}/);
+  if (!stats) throw new Error('stats-stack rule not found');
+  assertEqual(/display:\s*grid;/.test(stats[1]), true);
+  assertEqual(/grid-template-areas:\s*"logs logs"\s*"api ui";/.test(stats[1]), true);
+  assertEqual(/\.stats-stack #stat-logs\s*\{\s*grid-area:\s*logs;\s*\}/.test(css), true);
+  assertEqual(/\.stats-stack #stat-resp\s*\{\s*grid-area:\s*api;\s*\}/.test(css), true);
+  assertEqual(/\.stats-stack #stat-render\s*\{\s*grid-area:\s*ui;\s*\}/.test(css), true);
+});
+
 function loadAppWithRender() {
   const App = loadApp({}, ['core.js', 'toasts.js', 'state.js', 'query_history.js', 'render.js', 'render_table.js', 'render_pager.js', 'render_tabs.js', 'query.js']);
   const tbody = { innerHTML: '' };
@@ -105,7 +128,7 @@ test('render time is displayed separately from response time', () => {
   const { App, statRender } = loadAppWithRender();
   App.state.runtime.lastRenderMs = 37;
   App.render.renderRenderTime();
-  assertEqual(statRender.innerHTML, '<b>37ms</b> render time');
+  assertEqual(statRender.innerHTML, '<b>37ms</b> UI');
 });
 
 test('rejected searches stay visibly invalid until their text changes', () => {

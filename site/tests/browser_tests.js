@@ -60,7 +60,7 @@
   test('render timing is visible in the page header', () => {
     App.state.runtime.lastRenderMs = 12;
     App.render.renderRenderTime();
-    assertEqual(document.getElementById('stat-render').textContent.includes('12ms render time'), true);
+    assertEqual(document.getElementById('stat-render').textContent.includes('12ms UI'), true);
   });
 
   log('');

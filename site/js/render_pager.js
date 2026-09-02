@@ -27,9 +27,10 @@
     const totalPages = App.state.runtime.totalPages;
     const logs = Number(App.state.runtime.totalCount).toLocaleString();
     const response = App.renderInternals.responseTimeText();
+    const render = App.renderInternals.renderTimeText();
     const text = App.isMobileMode()
-      ? `Page ${currentPage}/${totalPages} - ${logs} logs - ${response}`
-      : `Page ${currentPage} of ${totalPages} - ${logs} available logs - ${response} response time`;
+      ? `Page ${currentPage}/${totalPages} - ${logs} Logs - ${response} API - ${render} UI`
+      : `Page ${currentPage} of ${totalPages} - ${logs} Logs - ${response} API - ${render} UI`;
     dom.byId('pager-meta').textContent = text;
   }
 

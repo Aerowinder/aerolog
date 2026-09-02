@@ -212,7 +212,7 @@ test('pagination omits numbered page buttons when the non-mobile container is na
   assertEqual(elements['pager-buttons'].innerHTML.includes('Next page'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('Last page'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('class="pager-btn active"'), false);
-  assertEqual(elements['pager-meta'].textContent, 'Page 5 of 10 - 12,345 available logs - 82ms response time');
+  assertEqual(elements['pager-meta'].textContent, 'Page 5 of 10 - 12,345 Logs - 82ms API - -- UI');
 });
 
 test('pagination uses nav-only controls and shorthand metadata in mobile mode', () => {
@@ -237,7 +237,7 @@ test('pagination uses nav-only controls and shorthand metadata in mobile mode', 
   const buttons = elements['pager-buttons'].innerHTML.match(/<button/g) || [];
   assertDeepEqual(mediaQueries, ['(max-width: 1000px)', '(max-width: 1000px)']);
   assertEqual(buttons.length, 4);
-  assertEqual(elements['pager-meta'].textContent, 'Page 5/10 - 12,345 logs - 82ms');
+  assertEqual(elements['pager-meta'].textContent, 'Page 5/10 - 12,345 Logs - 82ms API - -- UI');
 });
 
 test('pagination grows to an odd intermediate range as space allows', () => {
@@ -259,7 +259,7 @@ test('pagination grows to an odd intermediate range as space allows', () => {
   assertEqual(elements['pager-buttons'].innerHTML.includes('data-page="18"'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('data-page="22"'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('Page 20 of 50'), true);
-  assertEqual(elements['pager-meta'].textContent, 'Page 20 of 50 - 12,345 available logs - 82ms response time');
+  assertEqual(elements['pager-meta'].textContent, 'Page 20 of 50 - 12,345 Logs - 82ms API - -- UI');
 });
 
 test('pagination caps the wide numbered range at fifteen pages', () => {
@@ -279,7 +279,7 @@ test('pagination caps the wide numbered range at fifteen pages', () => {
   assertEqual(elements['pager-buttons'].innerHTML.includes('data-page="13"'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('data-page="27"'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('Page 20 of 50'), true);
-  assertEqual(elements['pager-meta'].textContent, 'Page 20 of 50 - 0 available logs - -- response time');
+  assertEqual(elements['pager-meta'].textContent, 'Page 20 of 50 - 0 Logs - -- API - -- UI');
 });
 
 test('config export maps internal columns to compact export keys', () => {
@@ -287,7 +287,7 @@ test('config export maps internal columns to compact export keys', () => {
   App.persist.logview.colwidths({ widths: { _time: 240, hostname: 180, priority: 100, facility: 120, app_name: 140 } });
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertEqual(exported.settings_version, 100);
-  assertEqual(exported.aerolog_version, '1.2');
+  assertEqual(exported.aerolog_version, '1.3');
   assertEqual(exported.export_time, '2026-04-13T12:34:56.000Z');
   assertDeepEqual(exported.logview, {
     rowcount: '100',

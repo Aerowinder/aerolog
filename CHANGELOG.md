@@ -1,8 +1,13 @@
 # Changelog
 
+## 1.3
+- Moved server pill to right side, next to Settings button.
+- Move metrics to the center of the header.
+
 ## 1.2
 - Added rejected-query feedback: a clear error toast and red search text while the rejected query remains unchanged. Poll retries stay quiet, and a query error does not make an active connection appear offline.
 - Added a render-time header stat alongside available-log and response-time stats.
+- Added short Logs/API/UI metrics to the header and pager.
 - Toolbar selections now return keyboard shortcut focus immediately after changing Poll, Rows, or Last.
 - Config imports now validate fully before applying settings
 - Heartbeats requests report a timeout instead of loading indefinitely.

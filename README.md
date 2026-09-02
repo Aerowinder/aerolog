@@ -300,7 +300,7 @@ A few behavior notes:
 - If polling is paused, the indicator goes gray even if the server is offline
 - If pagination or other runtime state pauses effective polling, the Poll control displays `Off` without overwriting the saved poll preference
 
-The header shows available-log count, response time, and render time. Render time measures Aerolog's synchronous table/UI update work; it does not include browser paint or GPU compositing.
+The header keeps app identity on the left, Logs on the first centered metric line, API and UI on the second, and connection status plus Settings on the right. The compact two-line metrics fit within the existing header height. On desktop, the server pill stays on one line and truncates only after the combined width of the Poll, Rows, and Last controls, with room reserved for Settings. This header layout is still being refined. Mobile keeps the pill to one line. The pager repeats those metrics. Render time measures Aerolog's synchronous table/UI update work; it does not include browser paint or GPU compositing.
 - The progress bar remains visible as part of the pill state
 - The next poll is anchored to **when the request is sent**, not when the response returns
 - Manual refresh-causing actions re-anchor the next poll countdown from that send time
@@ -332,7 +332,7 @@ The pager at the bottom lets you walk back through history.
 
 On non-mobile viewports, the pager uses as many numbered page buttons as fit, up to 15, and keeps the current page centered when possible. On mobile viewports, 1000px wide or below, Aerolog switches to compact first/previous/next/last controls to preserve horizontal space.
 
-The footer also shows page position, available log count, and response time. Non-mobile wording is fuller, like `Page 20 of 50 - 12,345 available logs - 82ms response time`; mobile wording is shorter, like `Page 20/50 - 12,345 logs - 82ms`.
+The footer also shows page position plus Logs, API, and UI timings. Non-mobile wording is `Page 20 of 50 - 12,345 Logs - 82ms API - 50ms UI`; mobile wording shortens only the page position, to `Page 20/50 - 12,345 Logs - 82ms API - 50ms UI`.
 
 When you leave page 1, polling pauses automatically. That is intentional. Live polling while you are paging backward would shift offsets and make the view jump around like an idiot.
 
