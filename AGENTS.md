@@ -254,7 +254,7 @@ Response time updates after every successful refresh, including settings-driven 
 - A rejected HTTP 400 query is not a connection failure; preserve the active-poll green state while the query feedback is shown elsewhere.
 
 ### Header layout
-Keep app identity on the left, compact centered metrics, and connection status plus Settings on the right. Metrics use a two-row grid inside the existing header height: Logs first, then API and UI. Do not make them a separate header row, so variable server names cannot displace them. Desktop server text stays on one line and ellipsizes only beyond the combined Poll, Rows, and Last control span, after reserving space for Settings and its gap. Mobile keeps a compact single-line pill. The header layout remains active refinement work; preserve this alignment rule while continuing it.
+Keep app identity on the left, compact centered metrics, and connection status plus Settings on the right. Metrics use a two-row grid inside the existing header height: the selected-range Logs metric first, then API and UI. Do not make them a separate header row, so variable server names cannot displace them. Header and pager metrics must render from the same metric snapshot; do not calculate their displayed values independently. Desktop server text stays on one line and ellipsizes only beyond the combined Poll, Rows, and Last control span, after reserving space for Settings and its gap. Mobile keeps a compact single-line pill. The header layout remains active refinement work; preserve this alignment rule while continuing it.
 
 ---
 
@@ -440,6 +440,8 @@ Portable Node binary available outside the repo:
 ```
 /mnt/git/aerolog-test/bin/node site/tests/run_tests.js
 ```
+
+The sibling `/mnt/git/aerolog-test` Git repository is approved for Aerolog test tooling and may be used as needed; do not modify it unless the user explicitly asks.
 
 Browser smoke-test page: `site/tests/index.html`.
 

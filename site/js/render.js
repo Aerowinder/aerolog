@@ -79,8 +79,9 @@
     }
   }
 
-  function renderStats() {
-    dom.byId('stat-logs').innerHTML = `<b>${Number(App.state.runtime.totalCount).toLocaleString()}</b> Logs`;
+  function timeRangeText() {
+    const range = App.state.config.logview.timerange;
+    return range === 'custom' ? 'Custom' : range;
   }
 
   function responseTimeText() {
@@ -95,19 +96,33 @@
     return `${value}ms`;
   }
 
+  function metricSnapshot() {
+    return {
+      logs: Number(App.state.runtime.totalCount).toLocaleString(),
+      timeRange: timeRangeText(),
+      response: responseTimeText(),
+      render: renderTimeText(),
+    };
+  }
+
+  function renderMetrics() {
+    const metrics = metricSnapshot();
+    dom.byId('stat-logs').innerHTML = `<b>${metrics.logs}</b> Logs (${metrics.timeRange})`;
+    dom.byId('stat-resp').innerHTML = `<b>${metrics.response}</b> API`;
+    dom.byId('stat-render').innerHTML = `<b>${metrics.render}</b> UI`;
+    if (App.render.renderPagerMeta) App.render.renderPagerMeta(metrics);
+  }
+
+  function renderStats() {
+    renderMetrics();
+  }
+
   function renderResponseTime() {
-    const el = dom.byId('stat-resp');
-    const text = responseTimeText();
-    el.innerHTML = `<b>${text}</b> API`;
-    if (App.render.renderPagerMeta && App.render.pageButtonCount) {
-      App.render.renderPagerMeta(App.render.pageButtonCount());
-    }
+    renderMetrics();
   }
 
   function renderRenderTime() {
-    const el = dom.byId('stat-render');
-    const text = renderTimeText();
-    el.innerHTML = `<b>${text}</b> UI`;
+    renderMetrics();
   }
 
   function renderError(message) {
@@ -157,6 +172,7 @@
     clearSearchInvalid,
     clearSearchInvalidOnEdit,
     renderStats,
+    renderMetrics,
     renderResponseTime,
     renderRenderTime,
     renderError,
@@ -165,6 +181,8 @@
   };
 
   App.renderInternals = {
+    timeRangeText,
+    metricSnapshot,
     responseTimeText,
     renderTimeText,
   };

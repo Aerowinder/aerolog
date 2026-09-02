@@ -116,6 +116,7 @@ function installActionStubs(App) {
     renderTabs() { calls.push('renderTabs'); },
     renderTabList() { calls.push('renderTabList'); },
     renderConnectionPill() { calls.push('renderConnectionPill'); },
+    renderStats() { calls.push('renderStats'); },
     renderLogs() { calls.push('renderLogs'); },
     renderToolToggles() { calls.push('renderToolToggles'); },
     renderMessageLineSelect() { calls.push('renderMessageLineSelect'); },

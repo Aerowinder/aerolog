@@ -24,8 +24,10 @@ test('custom time actions apply and clear custom ranges', async () => {
   assertEqual(App.state.config.logview.timecustom.start, '');
   assertDeepEqual(calls, [
     'renderToolbarState',
+    'renderStats',
     'dispatchRefresh:settings',
     'renderToolbarState',
+    'renderStats',
     'dispatchRefresh:settings',
   ]);
 });
@@ -43,7 +45,7 @@ test('setTimeRange custom reuses an existing valid custom range', async () => {
   const calls = installActionStubs(App);
   await App.actions.setTimeRange('custom');
   assertEqual(App.state.config.logview.timerange, 'custom');
-  assertDeepEqual(calls, ['renderToolbarState', 'dispatchRefresh:settings']);
+  assertDeepEqual(calls, ['renderToolbarState', 'renderStats', 'dispatchRefresh:settings']);
 });
 
 test('setTimeRange custom asks for a range when no valid custom range exists', async () => {

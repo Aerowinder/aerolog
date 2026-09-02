@@ -35,6 +35,9 @@ test('header metrics use a compact Logs then API/UI grid', () => {
   if (!stats) throw new Error('stats-stack rule not found');
   assertEqual(/display:\s*grid;/.test(stats[1]), true);
   assertEqual(/grid-template-areas:\s*"logs logs"\s*"api ui";/.test(stats[1]), true);
+  assertEqual(/font-size:\s*1rem;/.test(stats[1]), true);
+  assertEqual(/line-height:\s*1;/.test(stats[1]), true);
+  assertEqual(/row-gap:\s*0\.25rem;/.test(stats[1]), true);
   assertEqual(/\.stats-stack #stat-logs\s*\{\s*grid-area:\s*logs;\s*\}/.test(css), true);
   assertEqual(/\.stats-stack #stat-resp\s*\{\s*grid-area:\s*api;\s*\}/.test(css), true);
   assertEqual(/\.stats-stack #stat-render\s*\{\s*grid-area:\s*ui;\s*\}/.test(css), true);
@@ -115,7 +118,7 @@ function loadAppWithRender() {
       App.state.runtime.polling.pausedForExpansion = true;
     },
   };
-  return { App, tbody, toast, searchEl, statRender };
+  return { App, tbody, toast, searchEl, statLogs, statRender, pagerMeta };
 }
 
 test('renderAllStatic does not eagerly render hidden query history', () => {
@@ -129,6 +132,19 @@ test('render time is displayed separately from response time', () => {
   App.state.runtime.lastRenderMs = 37;
   App.render.renderRenderTime();
   assertEqual(statRender.innerHTML, '<b>37ms</b> UI');
+});
+
+test('header and footer Logs metrics share the selected time range', () => {
+  const { App, statLogs, pagerMeta } = loadAppWithRender();
+  App.state.runtime.totalCount = 12345;
+  App.state.config.logview.timerange = '1y';
+  App.render.renderStats();
+  assertEqual(statLogs.innerHTML, '<b>12,345</b> Logs (1y)');
+  assertEqual(pagerMeta.textContent, 'Page 1 of 1 - 12,345 Logs (1y) - -- API - -- UI');
+  App.state.config.logview.timerange = 'custom';
+  App.render.renderStats();
+  assertEqual(statLogs.innerHTML, '<b>12,345</b> Logs (Custom)');
+  assertEqual(pagerMeta.textContent, 'Page 1 of 1 - 12,345 Logs (Custom) - -- API - -- UI');
 });
 
 test('rejected searches stay visibly invalid until their text changes', () => {

@@ -15,6 +15,11 @@
     return err;
   }
 
+  function connectionErrorDetail(err) {
+    if (err.status) return `Connection error: HTTP ${err.status}`;
+    return `Connection error: ${err.message || 'Unable to reach VictoriaLogs'}`;
+  }
+
   async function runQuery(query, signal) {
     const response = await fetch(`${App.derive.apiBase()}/select/logsql/query`, {
       method: 'POST',
@@ -145,13 +150,13 @@
       App.state.runtime.lastResponseMs = null;
       App.state.runtime.lastRenderMs = null;
       App.state.runtime.connection.kind = 'err';
-      App.state.runtime.connection.detail = logsError.status ? `Logs query: HTTP ${logsError.status}` : `Logs query: ${logsError.message}`;
+      App.state.runtime.connection.detail = connectionErrorDetail(logsError);
       App.state.runtime.connection.hasFetched = true;
       App.render.renderConnectionPill();
       App.render.renderResponseTime();
       if (App.render.renderRenderTime) App.render.renderRenderTime();
       if (!App.state.runtime.currentLogs.length) {
-        App.render.renderError(`Connection error: ${logsError.message}`);
+        App.render.renderError(connectionErrorDetail(logsError));
       }
       App.polling.onRefreshCompleted(cause, { ok: false, detail: App.state.runtime.connection.detail, aborted: false });
       return { started: true, ok: false };
@@ -196,6 +201,7 @@
 
   App.api = {
     runQuery,
+    connectionErrorDetail,
     dispatchRefresh,
     abortActiveRequest,
   };

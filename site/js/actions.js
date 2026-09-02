@@ -60,6 +60,7 @@
     App.persist.logview.timerange(value);
     App.state.runtime.currentPage = 1;
     App.render.renderToolbarState();
+    App.render.renderStats();
     return App.api.dispatchRefresh('settings');
   };
 
@@ -73,6 +74,7 @@
     App.persist.logview.timerange('custom');
     App.state.runtime.currentPage = 1;
     App.render.renderToolbarState();
+    App.render.renderStats();
     return App.api.dispatchRefresh('settings');
   };
 
@@ -81,6 +83,7 @@
     App.persist.logview.timerange(App.DEFAULTS.logview.timerange);
     App.state.runtime.currentPage = 1;
     App.render.renderToolbarState();
+    App.render.renderStats();
     return App.api.dispatchRefresh('settings');
   };
 

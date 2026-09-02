@@ -157,13 +157,13 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
       "logs logs"
       "api ui";
     column-gap: 0.75rem;
-    row-gap: 0;
+    row-gap: 0.25rem;
     align-items: center;
     justify-items: center;
     font-family: var(--mono);
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: var(--text-dim);
-    line-height: 1.15;
+    line-height: 1;
     white-space: nowrap;
   }
   .stats-stack #stat-logs { grid-area: logs; }

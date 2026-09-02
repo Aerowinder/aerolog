@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.31
+- Increased the header metric text size and spacing for readability.
+- Added the selected time range to the Logs metric in the header and pager.
+- Kept header and pager metrics synchronized from one shared snapshot.
+
 ## 1.3
 - Moved server pill to right side, next to Settings button.
 - Move metrics to the center of the header.

@@ -54,6 +54,22 @@ test('malformed VictoriaLogs responses fail instead of silently dropping rows', 
   assertEqual(message, 'Malformed response from VictoriaLogs');
 });
 
+test('network errors use the same detail in the connection pill and table', async () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'api.js']);
+  App.__testContext.fetch = async () => { throw new Error('Network resource unavailable'); };
+  App.polling = { onRefreshDispatched() {}, onRefreshCompleted() {} };
+  let tableError = '';
+  App.render = {
+    renderLogs() {}, renderStats() {}, renderPagination() {}, renderResponseTime() {}, renderRenderTime() {}, renderConnectionPill() {},
+    renderError(message) { tableError = message; },
+  };
+
+  await App.api.dispatchRefresh('manual');
+  assertEqual(App.state.runtime.connection.detail, 'Connection error: Network resource unavailable');
+  assertEqual(tableError, App.state.runtime.connection.detail);
+  assertEqual(App.derive.connectionView().title, 'localhost:9428 - Connection error: Network resource unavailable');
+});
+
 test('manual refresh timeout aborts stalled requests and reports connection error', async () => {
   const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'api.js']);
   App.REQUEST_TIMEOUT_MS = 1;

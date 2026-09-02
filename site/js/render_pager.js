@@ -22,15 +22,12 @@
     return count % 2 === 0 ? count - 1 : count;
   }
 
-  function renderPagerMeta() {
+  function renderPagerMeta(metrics = App.renderInternals.metricSnapshot()) {
     const currentPage = App.state.runtime.currentPage;
     const totalPages = App.state.runtime.totalPages;
-    const logs = Number(App.state.runtime.totalCount).toLocaleString();
-    const response = App.renderInternals.responseTimeText();
-    const render = App.renderInternals.renderTimeText();
     const text = App.isMobileMode()
-      ? `Page ${currentPage}/${totalPages} - ${logs} Logs - ${response} API - ${render} UI`
-      : `Page ${currentPage} of ${totalPages} - ${logs} Logs - ${response} API - ${render} UI`;
+      ? `Page ${currentPage}/${totalPages} - ${metrics.logs} Logs (${metrics.timeRange}) - ${metrics.response} API - ${metrics.render} UI`
+      : `Page ${currentPage} of ${totalPages} - ${metrics.logs} Logs (${metrics.timeRange}) - ${metrics.response} API - ${metrics.render} UI`;
     dom.byId('pager-meta').textContent = text;
   }
 
