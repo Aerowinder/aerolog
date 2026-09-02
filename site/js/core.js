@@ -1,7 +1,7 @@
 (function () {
   const App = window.Aerolog = window.Aerolog || {};
 
-  App.VERSION = '1.1';
+  App.VERSION = '1.2';
 
   App.COLUMN_DEFS = {
     '_time':    { label: 'Timestamp', width: 220, exportKey: 'time',     className: 'ts'   },

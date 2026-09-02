@@ -82,10 +82,15 @@
     const settings = config.settings && typeof config.settings === 'object' && !Array.isArray(config.settings) ? config.settings : {};
     const logview = config.logview && typeof config.logview === 'object' && !Array.isArray(config.logview) ? config.logview : {};
 
-    const settingsCfg = App.state.config.settings;
-    const logviewCfg = App.state.config.logview;
+    const nextConfig = App.utils.clone(App.state.config);
+    const settingsCfg = nextConfig.settings;
+    const logviewCfg = nextConfig.logview;
     let settingsDirty = false;
     let logviewDirty = false;
+    let tabsDirty = false;
+    let aliasesDirty = false;
+    let queryhistDirty = false;
+    let querydefDirty = false;
     let themeApplied = null;
 
     if (settings.server != null) { settingsCfg.server = App.validators.server(settings.server); settingsDirty = true; }
@@ -93,37 +98,58 @@
     if (settings.tabvis != null) { settingsCfg.tabvis = App.validators.tabvis(settings.tabvis); settingsDirty = true; }
     if (settings.logtable != null) { settingsCfg.logtable = App.validators.logtable(settings.logtable); settingsDirty = true; }
     if (settings.fallback != null) { settingsCfg.fallback = App.validators.fallback(settings.fallback); settingsDirty = true; }
-    if (settingsDirty) App.state.writeGroup('settings');
-    if (themeApplied) App.utils.applyDocumentTheme(themeApplied, true);
-
     if (logview.rowcount != null) { logviewCfg.rowcount = App.validators.rowcount(logview.rowcount); logviewDirty = true; }
     if (logview.pollint != null) { logviewCfg.pollint = App.validators.pollint(logview.pollint); logviewDirty = true; }
     if (logview.timerange != null) { logviewCfg.timerange = App.validators.timerange(logview.timerange); logviewDirty = true; }
     if (logview.timecustom != null) { logviewCfg.timecustom = App.validators.timecustom(logview.timecustom); logviewDirty = true; }
     if (logview.colwidths != null) { logviewCfg.colwidths = App.validators.colwidths(importColumnWidths(logview.colwidths)); logviewDirty = true; }
-    if (logviewDirty) App.state.writeGroup('logview');
-
-    if (config.tabs != null) App.persist.tabs(config.tabs);
+    if (config.tabs != null) {
+      nextConfig.tabs = App.validators.tabs(config.tabs);
+      tabsDirty = true;
+    }
     if (config.aliases != null) {
       const duplicateFriendly = App.validators.duplicateFriendlyAlias(config.aliases);
       if (duplicateFriendly) throw new Error(`Duplicate friendly alias name: ${duplicateFriendly}`);
-      App.persist.aliases(config.aliases);
+      nextConfig.aliases = App.validators.aliases(config.aliases);
+      aliasesDirty = true;
     }
 
     const importedDefaultQuery = config.querydef != null ? App.validators.querydef(config.querydef) : '';
-    // Clear first so imported history can be normalized against only the imported default query, not a stale current one.
+    // Normalize imported history against only the imported default query, not a stale current one.
     // If the imported default is not present in history, drop it rather than creating a ghost startup query.
-    if (config.querydef != null) App.persist.querydef('');
-    if (config.queryhist != null) App.persist.queryhist(config.queryhist, { defaultQuery: importedDefaultQuery });
     if (config.querydef != null) {
-      const defaultIndex = App.state.config.queryhist.findIndex((entry) => entry.query === importedDefaultQuery);
-      if (defaultIndex !== -1) App.queryHistory.setDefault(defaultIndex);
+      nextConfig.querydef = '';
+      querydefDirty = true;
+    }
+    if (config.queryhist != null) {
+      nextConfig.queryhist = App.validators.queryhist(config.queryhist, importedDefaultQuery);
+      queryhistDirty = true;
+      if (nextConfig.querydef && !nextConfig.queryhist.some((entry) => entry.query === nextConfig.querydef)) {
+        nextConfig.querydef = '';
+        querydefDirty = true;
+      }
+    }
+    if (config.querydef != null) {
+      const defaultIndex = nextConfig.queryhist.findIndex((entry) => entry.query === importedDefaultQuery);
+      nextConfig.querydef = defaultIndex === -1 ? '' : importedDefaultQuery;
     }
 
-    if (App.state.config.logview.timerange === 'custom'
-      && (!App.state.config.logview.timecustom.start || !App.state.config.logview.timecustom.end)) {
-      App.persist.logview.timerange(App.DEFAULTS.logview.timerange);
+    if (nextConfig.logview.timerange === 'custom'
+      && (!nextConfig.logview.timecustom.start || !nextConfig.logview.timecustom.end)) {
+      nextConfig.logview.timerange = App.DEFAULTS.logview.timerange;
+      logviewDirty = true;
     }
+
+    // All validation completes before any runtime state or localStorage group changes.
+    App.state.config = nextConfig;
+    App.state.rebuildAliasReverse();
+    if (settingsDirty) App.state.writeGroup('settings');
+    if (logviewDirty) App.state.writeGroup('logview');
+    if (tabsDirty) App.state.writeGroup('tabs');
+    if (aliasesDirty) App.state.writeGroup('aliases');
+    if (queryhistDirty) App.state.writeGroup('queryhist');
+    if (querydefDirty) App.state.writeGroup('querydef');
+    if (themeApplied) App.utils.applyDocumentTheme(themeApplied, true);
     App.state.runtime.currentPage = 1;
     return App.state.config;
   }

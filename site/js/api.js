@@ -5,6 +5,16 @@
     return !!err && (err.name === 'AbortError' || /aborted/i.test(err.message || ''));
   }
 
+  function isQueryRejectedError(err) {
+    return !!err && err.status === 400;
+  }
+
+  function malformedResponseError() {
+    const err = new Error('Malformed response from VictoriaLogs');
+    err.malformedResponse = true;
+    return err;
+  }
+
   async function runQuery(query, signal) {
     const response = await fetch(`${App.derive.apiBase()}/select/logsql/query`, {
       method: 'POST',
@@ -18,9 +28,15 @@
       throw err;
     }
     const text = await response.text();
-    return text.trim().split('\n').filter(Boolean).map((line) => {
-      try { return JSON.parse(line); } catch { return null; }
-    }).filter(Boolean);
+    const rows = [];
+    for (const line of text.trim().split('\n').filter(Boolean)) {
+      try {
+        rows.push(JSON.parse(line));
+      } catch {
+        throw malformedResponseError();
+      }
+    }
+    return rows;
   }
 
   function clearRequestTimeout() {
@@ -39,7 +55,6 @@
       request.controller = null;
     }
     request.cause = null;
-    request.startedAt = 0;
   }
 
   function shouldSupersedeActiveRequest(nextCause) {
@@ -60,12 +75,13 @@
       App.state.runtime.connection.hasFetched = true;
       App.render.renderConnectionPill();
       App.state.runtime.lastResponseMs = null;
+      App.state.runtime.lastRenderMs = null;
       App.render.renderResponseTime();
+      if (App.render.renderRenderTime) App.render.renderRenderTime();
     }, timeoutMs);
   }
 
   async function dispatchRefresh(cause = 'manual') {
-    App.state.runtime.lastRefreshCause = cause;
     if (App.render && App.render.collapseAllRows) {
       App.render.collapseAllRows();
     }
@@ -82,7 +98,6 @@
     request.id += 1;
     request.controller = new AbortController();
     request.cause = cause;
-    request.startedAt = startAt;
     const requestId = request.id;
 
     App.polling.onRefreshDispatched(cause, startAt);
@@ -100,7 +115,6 @@
     clearRequestTimeout();
     request.controller = null;
     request.cause = null;
-    request.startedAt = 0;
 
     const elapsed = Date.now() - startAt;
 
@@ -111,13 +125,31 @@
       return { started: false, aborted: true };
     }
 
+    if (logsError && isQueryRejectedError(logsError)) {
+      App.state.runtime.lastResponseMs = null;
+      App.state.runtime.lastRenderMs = null;
+      // A 400 proves the configured VictoriaLogs server responded; it is not a connection failure.
+      App.state.runtime.connection.kind = 'ok';
+      App.state.runtime.connection.detail = '';
+      App.state.runtime.connection.hasFetched = true;
+      if (App.render.markSearchInvalid) App.render.markSearchInvalid(App.state.runtime.committedSearch);
+      if (cause !== 'poll' && App.toasts) App.toasts.error('Query rejected, check LogsQL syntax');
+      App.render.renderConnectionPill();
+      App.render.renderResponseTime();
+      if (App.render.renderRenderTime) App.render.renderRenderTime();
+      App.polling.onRefreshCompleted(cause, { ok: false, queryRejected: true, aborted: false });
+      return { started: true, ok: false, queryRejected: true };
+    }
+
     if (logsError) {
       App.state.runtime.lastResponseMs = null;
+      App.state.runtime.lastRenderMs = null;
       App.state.runtime.connection.kind = 'err';
       App.state.runtime.connection.detail = logsError.status ? `Logs query: HTTP ${logsError.status}` : `Logs query: ${logsError.message}`;
       App.state.runtime.connection.hasFetched = true;
       App.render.renderConnectionPill();
       App.render.renderResponseTime();
+      if (App.render.renderRenderTime) App.render.renderRenderTime();
       if (!App.state.runtime.currentLogs.length) {
         App.render.renderError(`Connection error: ${logsError.message}`);
       }
@@ -143,12 +175,16 @@
     App.state.runtime.connection.kind = 'ok';
     App.state.runtime.connection.detail = '';
     App.state.runtime.connection.hasFetched = true;
+    if (App.render.clearSearchInvalid) App.render.clearSearchInvalid(App.state.runtime.committedSearch);
 
+    const renderStartedAt = Date.now();
     App.render.renderLogs(logs);
     App.render.renderStats();
     App.render.renderPagination();
     App.render.renderResponseTime();
     App.render.renderConnectionPill();
+    App.state.runtime.lastRenderMs = Date.now() - renderStartedAt;
+    if (App.render.renderRenderTime) App.render.renderRenderTime();
 
     if (countError) {
       console.error('[aerolog] count query failed:', countError);

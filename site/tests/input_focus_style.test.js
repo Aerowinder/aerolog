@@ -57,5 +57,5 @@ test('every text input and textarea gets the accent focus outline', () => {
     if (!covered.has(selector)) missing.push(selector);
   }
   assertEqual(missing.length, 0,
-    `missing accent :focus rule for: ${missing.join(', ')} — add these selectors to a :focus rule that sets border-color: var(--accent) and box-shadow: 0 0 0 2px var(--accent-glow)`);
+    `missing accent :focus rule for: ${missing.join(', ')} - add these selectors to a :focus rule that sets border-color: var(--accent) and box-shadow: 0 0 0 2px var(--accent-glow)`);
 });

@@ -11,6 +11,13 @@
     'shortcuts-modal': () => App.shortcuts.closeShortcutsOverlay(),
   };
 
+  function selectedValueAndBlur(event) {
+    const select = event.target;
+    const value = select.value;
+    if (typeof select.blur === 'function') select.blur();
+    return value;
+  }
+
   function bindStaticEvents() {
     const searchInput = dom.byId('search');
     searchInput.addEventListener('keydown', (event) => {
@@ -19,22 +26,26 @@
         App.actions.runSearch(searchInput.value);
       }
     });
+    searchInput.addEventListener('input', () => {
+      App.render.clearSearchInvalidOnEdit(searchInput.value);
+    });
 
     dom.byId('poll-interval').addEventListener('change', async (event) => {
-      await App.actions.setPollInterval(event.target.value);
+      await App.actions.setPollInterval(selectedValueAndBlur(event));
     });
 
     dom.byId('page-size').addEventListener('change', async (event) => {
-      await App.actions.setPageSize(event.target.value);
+      await App.actions.setPageSize(selectedValueAndBlur(event));
     });
 
     dom.byId('time-range').addEventListener('change', async (event) => {
-      if (event.target.value === 'custom') {
+      const value = selectedValueAndBlur(event);
+      if (value === 'custom') {
         const result = await App.actions.setTimeRange('custom');
         if (result && result.reason === 'missing_custom_time') App.modals.openCustomTimeModal();
         return;
       }
-      await App.actions.setTimeRange(event.target.value);
+      await App.actions.setTimeRange(value);
     });
 
     dom.qa('.theme-choice').forEach((input) => {

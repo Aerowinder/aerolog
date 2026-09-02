@@ -23,6 +23,7 @@ function loadAppWithRender() {
   const versionText = { textContent: '' };
   const statLogs = { innerHTML: '' };
   const statResp = { innerHTML: '' };
+  const statRender = { innerHTML: '' };
   const pagerMeta = { textContent: '' };
   const pagerButtons = { innerHTML: '' };
   const tabs = { innerHTML: '', classList: { add() {}, remove() {}, toggle() {} }, clientWidth: 1000, scrollWidth: 500 };
@@ -31,7 +32,17 @@ function loadAppWithRender() {
   const pageSizeSelect = { value: '' };
   const timeRangeSelect = { value: '' };
   const messageLinesSelect = { value: '' };
-  const searchEl = { value: '' };
+  const searchClasses = new Set();
+  const searchEl = {
+    value: '',
+    classList: {
+      add(value) { searchClasses.add(value); },
+      remove(value) { searchClasses.delete(value); },
+      contains(value) { return searchClasses.has(value); },
+    },
+    setAttribute(name, value) { this[name] = value; },
+    removeAttribute(name) { delete this[name]; },
+  };
   const connStatus = { className: '', removeAttribute() {}, setAttribute(name, value) { this[name] = value; }, title: '' };
   const hostText = { textContent: '' };
   const connProgress = { style: {} };
@@ -52,6 +63,7 @@ function loadAppWithRender() {
     'version-text': versionText,
     'stat-logs': statLogs,
     'stat-resp': statResp,
+    'stat-render': statRender,
     'pager-meta': pagerMeta,
     'pager-buttons': pagerButtons,
     'tabs': tabs,
@@ -80,13 +92,37 @@ function loadAppWithRender() {
       App.state.runtime.polling.pausedForExpansion = true;
     },
   };
-  return { App, tbody, toast };
+  return { App, tbody, toast, searchEl, statRender };
 }
 
 test('renderAllStatic does not eagerly render hidden query history', () => {
   const { App } = loadAppWithRender();
   App.render.renderAllStatic();
   assertEqual(App.__queryHistoryRendered || 0, 0);
+});
+
+test('render time is displayed separately from response time', () => {
+  const { App, statRender } = loadAppWithRender();
+  App.state.runtime.lastRenderMs = 37;
+  App.render.renderRenderTime();
+  assertEqual(statRender.innerHTML, '<b>37ms</b> render time');
+});
+
+test('rejected searches stay visibly invalid until their text changes', () => {
+  const { App, searchEl } = loadAppWithRender();
+  searchEl.value = '[';
+  App.render.markSearchInvalid('[');
+  assertEqual(searchEl.classList.contains('invalid-query'), true);
+  assertEqual(searchEl['aria-invalid'], 'true');
+
+  App.render.clearSearchInvalidOnEdit('[');
+  assertEqual(searchEl.classList.contains('invalid-query'), true);
+
+  searchEl.value = '[]';
+  App.render.clearSearchInvalidOnEdit(searchEl.value);
+  assertEqual(App.state.runtime.invalidSearchQuery, null);
+  assertEqual(searchEl.classList.contains('invalid-query'), false);
+  assertEqual(searchEl['aria-invalid'], undefined);
 });
 
 test('toasts module supports error styling and durations', () => {

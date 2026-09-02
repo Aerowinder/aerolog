@@ -5,7 +5,7 @@
   // `fromVersion` up to `toVersion`. Append new entries here, lowest `fromVersion`
   // first, whenever `App.SETTINGS_VERSION` bumps and the config shape changes.
   //
-  // Keep each step narrow — only touch the fields that actually changed in that
+  // Keep each step narrow - only touch the fields that actually changed in that
   // version, and mutate the passed-in config in place. Validators in core.js
   // still run afterward, so migrations only need to reshape keys, not re-validate
   // values.

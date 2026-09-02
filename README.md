@@ -181,6 +181,8 @@ Use Heartbeats to summarize host activity for the current **Last** time range.
 
 Heartbeats lists each host that sent logs in that window, the number of messages seen, and a relative last-seen age. It does not apply the current search box text or active host tab.
 
+If a Heartbeats request does not return, Aerolog reports a timeout instead of leaving the modal loading indefinitely.
+
 ## Keyboard shortcuts
 
 Press `?` anywhere in the app to open a cheat sheet. Current bindings:
@@ -199,6 +201,8 @@ Shortcuts are inactive while you are typing in a text field (including `?`, so y
 ## Search syntax
 
 Aerolog sends queries through to VictoriaLogs as LogsQL, with some friendly rewrites and wildcard sugar layered on top.
+
+If VictoriaLogs rejects a submitted query, Aerolog shows an error toast and marks the search text red. The red state clears when you edit the query. Automatic poll retries remain quiet, and a rejected query does not make an active polling connection appear offline.
 
 One important detail: `*` wildcard handling is **Aerolog behavior**, not official LogsQL syntax. Native LogsQL uses exact matching with `:=` and regex matching with `:~`.
 
@@ -295,6 +299,8 @@ A few behavior notes:
 - The configured hostname stays visible in the pill even if polling fails
 - If polling is paused, the indicator goes gray even if the server is offline
 - If pagination or other runtime state pauses effective polling, the Poll control displays `Off` without overwriting the saved poll preference
+
+The header shows available-log count, response time, and render time. Render time measures Aerolog's synchronous table/UI update work; it does not include browser paint or GPU compositing.
 - The progress bar remains visible as part of the pill state
 - The next poll is anchored to **when the request is sent**, not when the response returns
 - Manual refresh-causing actions re-anchor the next poll countdown from that send time
@@ -318,7 +324,7 @@ Column widths are saved locally. Drag a column resize handle to set a custom wid
 
 The Settings modal includes **Message lines** controls for choosing whether the Message column previews 1, 2, 3, 4, or 5 lines. You can also show or hide the row expand, copy, and click-to-filter controls. Turning off row expansion collapses any rows that are already open. Use the small expand control in a Message cell to inspect every raw VictoriaLogs field on that log row, sorted by original field name. Expanded rows use original field values, so hostname aliases only affect the collapsed table display. Expanded detail field names use the same auto-sized key column on desktop and mobile so long structured field names stay readable.
 
-Expanding a row pauses live polling as runtime state without changing your saved poll interval. Collapsing rows does not automatically resume polling — Aerolog only resumes live polling when you explicitly pick a poll interval again.
+Expanding a row pauses live polling as runtime state without changing your saved poll interval. Collapsing rows does not automatically resume polling - Aerolog only resumes live polling when you explicitly pick a poll interval again.
 
 ## Pagination behavior
 

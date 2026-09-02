@@ -56,6 +56,29 @@
     dom.byId('search').value = App.state.runtime.committedSearch;
   }
 
+  function markSearchInvalid(query) {
+    const search = dom.byId('search');
+    App.state.runtime.invalidSearchQuery = query;
+    if (!search) return;
+    search.classList.add('invalid-query');
+    search.setAttribute('aria-invalid', 'true');
+  }
+
+  function clearSearchInvalid(query) {
+    if (query !== undefined && App.state.runtime.invalidSearchQuery !== query) return;
+    App.state.runtime.invalidSearchQuery = null;
+    const search = dom.byId('search');
+    if (!search) return;
+    search.classList.remove('invalid-query');
+    search.removeAttribute('aria-invalid');
+  }
+
+  function clearSearchInvalidOnEdit(value) {
+    if (App.state.runtime.invalidSearchQuery !== null && value !== App.state.runtime.invalidSearchQuery) {
+      clearSearchInvalid();
+    }
+  }
+
   function renderStats() {
     dom.byId('stat-logs').innerHTML = `<b>${Number(App.state.runtime.totalCount).toLocaleString()}</b> available logs`;
   }
@@ -66,6 +89,12 @@
     return value < 1000 ? `${value}ms` : `${(value / 1000).toFixed(1)}s`;
   }
 
+  function renderTimeText() {
+    const value = App.state.runtime.lastRenderMs;
+    if (value == null) return '--';
+    return `${value}ms`;
+  }
+
   function renderResponseTime() {
     const el = dom.byId('stat-resp');
     const text = responseTimeText();
@@ -73,6 +102,12 @@
     if (App.render.renderPagerMeta && App.render.pageButtonCount) {
       App.render.renderPagerMeta(App.render.pageButtonCount());
     }
+  }
+
+  function renderRenderTime() {
+    const el = dom.byId('stat-render');
+    const text = renderTimeText();
+    el.innerHTML = text === '--' ? '<b>--</b> render time' : `<b>${text}</b> render time`;
   }
 
   function renderError(message) {
@@ -107,6 +142,7 @@
     App.render.renderPagination();
     renderStats();
     renderResponseTime();
+    renderRenderTime();
     renderConnectionPill();
   }
 
@@ -117,8 +153,12 @@
     renderRowActionToggles,
     renderHostnameFallbackControls,
     renderToolbarState,
+    markSearchInvalid,
+    clearSearchInvalid,
+    clearSearchInvalidOnEdit,
     renderStats,
     renderResponseTime,
+    renderRenderTime,
     renderError,
     renderConnectionPill,
     renderAllStatic,
@@ -126,5 +166,6 @@
 
   App.renderInternals = {
     responseTimeText,
+    renderTimeText,
   };
 })();

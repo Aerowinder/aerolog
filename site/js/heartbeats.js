@@ -69,13 +69,20 @@
     if (controller) controller.abort();
     const activeController = new AbortController();
     controller = activeController;
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      activeController.abort();
+    }, App.REQUEST_TIMEOUT_MS);
     try {
       const rows = await App.api.runQuery(App.query.buildHeartbeatsQuery(), activeController.signal);
       renderHeartbeatsRows(rows);
     } catch (err) {
-      if (err && err.name === 'AbortError') return;
-      dom.byId('heartbeats-body').innerHTML = `<tr><td colspan="3" class="error-row">${App.utils.escapeHtml(err.message || 'Heartbeats query failed')}</td></tr>`;
+      if (err && err.name === 'AbortError' && !timedOut) return;
+      const message = timedOut ? `Heartbeats request timed out after ${App.REQUEST_TIMEOUT_MS}ms` : (err.message || 'Heartbeats query failed');
+      dom.byId('heartbeats-body').innerHTML = `<tr><td colspan="3" class="error-row">${App.utils.escapeHtml(message)}</td></tr>`;
     } finally {
+      clearTimeout(timeoutId);
       if (controller === activeController) controller = null;
     }
   }

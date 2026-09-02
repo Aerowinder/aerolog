@@ -48,3 +48,28 @@ test('heartbeats modal renders query failures without throwing', async () => {
   await App.heartbeats.openHeartbeatsModal();
   assertEqual(elements['heartbeats-body'].innerHTML.includes('boom'), true);
 });
+
+test('heartbeats requests time out instead of leaving the modal loading forever', async () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'heartbeats.js']);
+  App.REQUEST_TIMEOUT_MS = 1;
+  const elements = {
+    'heartbeats-range': { textContent: '' },
+    'heartbeats-body': { innerHTML: '' },
+  };
+  App.dom.byId = (id) => elements[id] || null;
+  App.modals = { openModal() {}, closeModal() {} };
+  App.api = {
+    runQuery(_query, signal) {
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    },
+  };
+
+  await App.heartbeats.openHeartbeatsModal();
+  assertEqual(elements['heartbeats-body'].innerHTML.includes('Heartbeats request timed out after 1ms'), true);
+});

@@ -30,9 +30,10 @@
       totalCount: 0,
       currentLogs: [],
       committedSearch: config ? config.querydef : '',
+      invalidSearchQuery: null,
       aliasReverse: {},
       lastResponseMs: null,
-      lastRefreshCause: 'init',
+      lastRenderMs: null,
       connection: {
         kind: 'idle',
         detail: '',
@@ -42,7 +43,6 @@
         id: 0,
         controller: null,
         cause: null,
-        startedAt: 0,
         timeoutId: null,
       },
       polling: {
@@ -115,7 +115,7 @@
         return {
           state: autoPolling ? 'err' : 'paused',
           text: host,
-          title: connection.detail ? `${host} — ${connection.detail}` : host,
+          title: connection.detail ? `${host} - ${connection.detail}` : host,
         };
       }
       if (connection.kind === 'ok') {

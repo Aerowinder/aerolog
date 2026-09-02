@@ -1,4 +1,4 @@
-/* Breakpoints — keep in sync with core.js App.MOBILE_MAX_WIDTH.
+/* Breakpoints - keep in sync with core.js App.MOBILE_MAX_WIDTH.
  * Only one responsive breakpoint is allowed: (max-width: 1000px).
  * Do not introduce additional @media width literals; extend the 1000px
  * tier or raise it for review. Enforced by the css-breakpoints test. */
@@ -345,6 +345,10 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     font-family: var(--mono);
     font-size: 1rem;
     outline: none;
+  }
+  .search-box input.invalid-query {
+    color: var(--accent);
+    border-color: var(--accent);
   }
   .search-clear,
   .search-history-toggle {

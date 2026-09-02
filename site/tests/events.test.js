@@ -30,6 +30,7 @@ function loadAppWithEvents() {
     renderAllStatic() {},
     updateTabOverflow() {},
     renderPagination() {},
+    clearSearchInvalidOnEdit(value) { App.__searchValidationInput = value; },
   };
   App.polling = {
     applyPolling() { App.__appliedPolling = true; },
@@ -72,6 +73,33 @@ test('server URL blur applies pending server settings', () => {
   const { App, elements } = loadAppWithEvents();
   elements['server-url'].listeners.blur();
   assertEqual(App.__appliedServer, true);
+});
+
+test('editing the search text clears a prior invalid-query state', () => {
+  const { App, elements } = loadAppWithEvents();
+  elements.search.value = 'host:good';
+  elements.search.listeners.input();
+  assertEqual(App.__searchValidationInput, 'host:good');
+});
+
+test('toolbar selections blur before their refresh actions run so shortcuts recover immediately', async () => {
+  const { App, elements } = loadAppWithEvents();
+  const selections = [];
+  App.actions.setPollInterval = async (value) => selections.push(`poll:${value}`);
+  App.actions.setPageSize = async (value) => selections.push(`rows:${value}`);
+  App.actions.setTimeRange = async (value) => selections.push(`time:${value}`);
+
+  elements['poll-interval'].value = '5';
+  await elements['poll-interval'].listeners.change({ target: elements['poll-interval'] });
+  elements['page-size'].value = '250';
+  await elements['page-size'].listeners.change({ target: elements['page-size'] });
+  elements['time-range'].value = '1d';
+  await elements['time-range'].listeners.change({ target: elements['time-range'] });
+
+  assertEqual(elements['poll-interval'].blurred, true);
+  assertEqual(elements['page-size'].blurred, true);
+  assertEqual(elements['time-range'].blurred, true);
+  assertEqual(selections.join(','), 'poll:5,rows:250,time:1d');
 });
 
 test('Escape while editing server URL aborts the draft before closing overlays', () => {

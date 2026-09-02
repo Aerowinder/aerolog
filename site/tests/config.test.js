@@ -287,7 +287,7 @@ test('config export maps internal columns to compact export keys', () => {
   App.persist.logview.colwidths({ widths: { _time: 240, hostname: 180, priority: 100, facility: 120, app_name: 140 } });
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertEqual(exported.settings_version, 100);
-  assertEqual(exported.aerolog_version, '1.1');
+  assertEqual(exported.aerolog_version, '1.2');
   assertEqual(exported.export_time, '2026-04-13T12:34:56.000Z');
   assertDeepEqual(exported.logview, {
     rowcount: '100',
@@ -535,6 +535,22 @@ test('config import drops defaults that are missing from history', () => {
   assertDeepEqual(App.state.config.queryhist, [{ query: 'present', pinned: false }]);
 });
 
+test('config import rejects invalid aliases without partially applying earlier settings', () => {
+  const App = loadApp({}, ['core.js', 'toasts.js', 'state.js', 'query_history.js', 'settings_migration.js', 'config_io.js']);
+  const before = App.utils.clone(App.state.config);
+  let message = '';
+  try {
+    App.configIo.applyImportedConfig({
+      settings: { server: 'changed.example:9428' },
+      aliases: { host1: 'duplicate', host2: 'duplicate' },
+    });
+  } catch (err) {
+    message = err.message;
+  }
+  assertEqual(message, 'Duplicate friendly alias name: duplicate');
+  assertDeepEqual(App.state.config, before);
+});
+
 test('config import rejects pre-100 settings versions', () => {
   const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   let message = '';
@@ -696,7 +712,7 @@ test('derive.connectionView produces the right pill state for every connection/a
   App.state.runtime.connection = { kind: 'err', detail: 'timeout', hasFetched: true };
   setCanAutoPoll(true);
   assertEqual(App.derive.connectionView().state, 'err');
-  assertEqual(App.derive.connectionView().title, 'logs.example:9428 — timeout');
+  assertEqual(App.derive.connectionView().title, 'logs.example:9428 - timeout');
   setCanAutoPoll(false);
   assertEqual(App.derive.connectionView().state, 'paused');
 

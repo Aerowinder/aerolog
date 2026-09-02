@@ -57,6 +57,12 @@
     assertEqual(typeof App.actions.setPollInterval, 'function');
   });
 
+  test('render timing is visible in the page header', () => {
+    App.state.runtime.lastRenderMs = 12;
+    App.render.renderRenderTime();
+    assertEqual(document.getElementById('stat-render').textContent.includes('12ms render time'), true);
+  });
+
   log('');
-  log(failed ? `${failed} browser tests failed` : '4 browser tests passed', failed ? 'fail' : 'pass');
+  log(failed ? `${failed} browser tests failed` : '5 browser tests passed', failed ? 'fail' : 'pass');
 })();
