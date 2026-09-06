@@ -62,7 +62,7 @@ test('quoted string bodies are not searched for friendly fields', () => {
 
 test('unterminated quoted field values do not rewrite later text inside the quote', () => {
   const App = loadApp();
-  assertEqual(App.query.rewriteQuery('app:"oops host:router-01'), 'app:"oops host:router-01');
+  assertEqual(App.query.rewriteQuery('app:="oops host:router-01'), 'app:="oops host:router-01');
 });
 
 test('parenthesized friendly filters keep closing suffixes intact', () => {
@@ -86,12 +86,12 @@ test('field filters build readable clauses for structured table cells', () => {
   ];
 
   const target = (row, column) => ({ dataset: { filterRow: String(row), filterColumn: column } });
-  assertEqual(App.fieldFilters.filterFromTarget(target(0, 'hostname')).clause, 'host:"router-01"');
+  assertEqual(App.fieldFilters.filterFromTarget(target(0, 'hostname')).clause, 'host:="router-01"');
   assertEqual(App.query.rewriteQuery(App.fieldFilters.filterFromTarget(target(0, 'hostname')).clause), '(hostname:="10.0.0.5" OR (hostname:"" AND app_name:="10.0.0.5"))');
-  assertEqual(App.fieldFilters.filterFromTarget(target(0, 'priority')).clause, 'sev:3');
-  assertEqual(App.fieldFilters.filterFromTarget(target(0, 'facility')).clause, 'fac:"auth"');
-  assertEqual(App.fieldFilters.filterFromTarget(target(1, 'facility')).clause, 'facility_num:10');
-  assertEqual(App.fieldFilters.filterFromTarget(target(1, 'app_name')).clause, 'app:"cron job"');
+  assertEqual(App.fieldFilters.filterFromTarget(target(0, 'priority')).clause, 'sev:="3"');
+  assertEqual(App.fieldFilters.filterFromTarget(target(0, 'facility')).clause, 'fac:="auth"');
+  assertEqual(App.fieldFilters.filterFromTarget(target(1, 'facility')).clause, 'facility_num:="10"');
+  assertEqual(App.fieldFilters.filterFromTarget(target(1, 'app_name')).clause, 'app:="cron job"');
   assertEqual(App.query.rewriteQuery(App.fieldFilters.filterFromTarget(target(1, 'app_name')).clause), 'app_name:="cron job"');
 });
 
@@ -101,7 +101,7 @@ test('hostname click-to-filter uses the fallback identity and alias', () => {
   }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'field_filters.js']);
   App.state.runtime.currentLogs = [{ app_name: 'HOME-UPS(192.168.10.6)' }];
   const target = { dataset: { filterRow: '0', filterColumn: 'hostname' } };
-  assertEqual(App.fieldFilters.filterFromTarget(target).clause, 'host:"home-ups"');
+  assertEqual(App.fieldFilters.filterFromTarget(target).clause, 'host:="home-ups"');
 });
 
 test('field filters skip time and message but include safe detail fields', () => {
@@ -186,4 +186,49 @@ test('active tab filters the query by its host list with alias resolution', () =
   assertEqual(clause.startsWith('_time:1h '), true);
   assertEqual(clause.includes('hostname:="10.0.0.5"'), true);
   assertEqual(clause.includes('hostname:~"^switch-.*$"'), true);
+});
+
+
+test('quoted values preserve empty strings, whitespace, escapes and native quote styles', () => {
+  const App = loadApp();
+  App.state.config.settings.fallback.hostname.enabled = false;
+  const cases = [
+    ['app:""', 'app_name:=""'], ['host:""', 'hostname:=""'],
+    ['msg:" padded "', '_msg:=" padded "'],
+    [String.raw`app:"a\"b"`, String.raw`app_name:="a\"b"`],
+    [String.raw`host:~"\\d+"`, String.raw`hostname:~"\\d+"`],
+    ["'literal app:sshd'", "'literal app:sshd'"],
+    ['`literal app:sshd`', '`literal app:sshd`'],
+    ["app:' padded '", "app_name:=' padded '"],
+    ['app:`C:\\path`', 'app_name:=`C:\\path`'],
+    ['!host:router', '!hostname:="router"'],
+    [String.raw`app:"bad\q app:sshd"`, String.raw`app:"bad\q app:sshd"`],
+  ];
+  for (const [input, expected] of cases) assertEqual(App.query.rewriteQuery(input), expected, input);
+  App.persist.aliases({ raw: 'café' });
+  assertEqual(App.query.rewriteQuery(String.raw`host:"caf\xc3\xa9"`), 'hostname:="raw"');
+  assertEqual(App.query.rewriteQuery(String.raw`app:"caf\xc3\xa9*"`), 'app_name:~"^café.*$"');
+});
+
+test('OR search branches stay inside tab and time constraints with pipelines preserved', () => {
+  const App = loadApp();
+  App.state.config.settings.fallback.hostname.enabled = false;
+  App.state.config.tabs = [{ id: 1, name: 'Web', hosts: ['web'] }];
+  App.state.runtime.activeTabId = 1;
+  App.state.runtime.committedSearch = 'error OR warning | fields _time, _msg';
+  assertEqual(App.query.buildFilterClause(), '_time:1h (hostname:="web") (error OR warning) | fields _time, _msg');
+  assertEqual(App.query.appendFilter('error OR "a|b" | fields _msg', 'app:="sshd"'), '(error OR "a|b") app:="sshd" | fields _msg');
+  App.state.runtime.committedSearch = 'app:a*|limit 2';
+  assertEqual(App.query.buildFilterClause(), '_time:1h (hostname:="web") (app_name:~"^a.*$") |limit 2');
+  assertEqual(App.query.appendFilter('_stream:{id in (* | fields id)}', 'x:=1'), '(_stream:{id in (* | fields id)}) x:=1');
+});
+
+test('click filters preserve literal stars and the identity of expanded raw fields', () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'query.js', 'field_filters.js']);
+  App.state.runtime.currentLogs = [{ app_name: 'literal*name', app: 'raw app', hostname: 'raw', facility: '4', facility_keyword: 'auth' }];
+  const filter = (dataset) => App.fieldFilters.filterFromTarget({ dataset: { filterRow: '0', ...dataset } }).clause;
+  assertEqual(App.query.rewriteQuery(filter({ filterColumn: 'app_name' })), 'app_name:="literal*name"');
+  assertEqual(App.query.rewriteQuery(filter({ filterField: 'facility' })), '"facility":="4"');
+  assertEqual(App.query.rewriteQuery(filter({ filterField: 'app' })), '"app":="raw app"');
+  assertEqual(App.query.rewriteQuery(filter({ filterField: 'hostname' })), '"hostname":="raw"');
 });

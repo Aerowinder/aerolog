@@ -33,7 +33,8 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     --purple: #c678dd;
   }
 
-  [data-theme="light"] {
+  [data-theme="light"],
+  [data-theme="system"][data-system-theme="light"] {
     --bg: #fafaf7;
     --surface: #ffffff;
     --surface2: #f3f2ee;
@@ -49,26 +50,6 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     --yellow: #b8881a;
     --blue: #2a6fb8;
     --purple: #8a3fa8;
-  }
-
-  @media (prefers-color-scheme: light) {
-    [data-theme="system"] {
-      --bg: #fafaf7;
-      --surface: #ffffff;
-      --surface2: #f3f2ee;
-      --border: #e3e1db;
-      --border-hi: #c8c5bc;
-      --text: #2a2a28;
-      --text-dim: #787670;
-      --text-bright: #0f0f0e;
-      --accent: #c8321f;
-      --accent-soft: #d96651;
-      --accent-glow: rgba(200, 50, 31, 0.08);
-      --green: #4a8a2e;
-      --yellow: #b8881a;
-      --blue: #2a6fb8;
-      --purple: #8a3fa8;
-    }
   }
 
   :root {
@@ -1102,13 +1083,9 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
   .choice-option input[type="checkbox"] {
     border-radius: 3px;
   }
-  [data-theme="dark"] .choice-option input:not(:checked) {
+  [data-theme="dark"] .choice-option input:not(:checked),
+  [data-theme="system"]:not([data-system-theme="light"]) .choice-option input:not(:checked) {
     border-color: #353d48;
-  }
-  @media (prefers-color-scheme: dark) {
-    [data-theme="system"] .choice-option input:not(:checked) {
-      border-color: #353d48;
-    }
   }
   .choice-option input:checked {
     border-color: var(--accent);
@@ -1219,7 +1196,6 @@ html.theme-switching *, html.theme-switching *::before, html.theme-switching *::
     cursor: not-allowed;
   }
   .heartbeats-wrap {
-    max-height: 55vh;
     overflow: auto;
     border: 1px solid var(--border);
     border-radius: 3px;

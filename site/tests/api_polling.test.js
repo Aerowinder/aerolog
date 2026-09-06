@@ -18,11 +18,9 @@ test('manual refresh runs count query while poll refresh skips it', async () => 
     onRefreshCompleted() {},
   };
   App.render = {
+    renderMetrics() {},
     renderLogs() {},
-    renderStats() {},
     renderPagination() {},
-    renderResponseTime() {},
-    renderRenderTime() {},
     renderConnectionPill() {},
     renderError() {},
   };
@@ -60,7 +58,8 @@ test('network errors use the same detail in the connection pill and table', asyn
   App.polling = { onRefreshDispatched() {}, onRefreshCompleted() {} };
   let tableError = '';
   App.render = {
-    renderLogs() {}, renderStats() {}, renderPagination() {}, renderResponseTime() {}, renderRenderTime() {}, renderConnectionPill() {},
+    renderMetrics() {},
+    renderLogs() {}, renderPagination() {}, renderConnectionPill() {},
     renderError(message) { tableError = message; },
   };
 
@@ -87,9 +86,8 @@ test('manual refresh timeout aborts stalled requests and reports connection erro
   };
   App.render = {
     renderLogs() {},
-    renderStats() {},
     renderPagination() {},
-    renderResponseTime() { renders.push('response'); },
+    renderMetrics() { renders.push('response'); },
     renderConnectionPill() { renders.push('pill'); },
     renderError() {},
   };
@@ -120,12 +118,11 @@ test('a rejected query marks the search invalid without treating VictoriaLogs as
     error(message) { toasts.push(message); },
   };
   App.render = {
+    renderMetrics() {},
     markSearchInvalid(query) { invalidQueries.push(query); },
     clearSearchInvalid() {},
     renderLogs() {},
-    renderStats() {},
     renderPagination() {},
-    renderResponseTime() {},
     renderConnectionPill() {},
     renderError() {},
   };
@@ -153,6 +150,7 @@ test('polling pauses while hidden and re-anchors when visible', () => {
   };
   App.dom.byId = (id) => (id === 'conn-progress' ? progress : null);
   App.render = {
+    renderMetrics() {},
     renderConnectionPill() { calls.push('pill'); },
   };
   App.api = {
@@ -196,10 +194,9 @@ test('page overflow refresh clamps and refetches without completing stale data',
     },
   };
   App.render = {
+    renderMetrics() {},
     renderLogs(logs) { renderedMessages.push(logs.map((log) => log._msg).join(',')); },
-    renderStats() {},
     renderPagination() {},
-    renderResponseTime() {},
     renderConnectionPill() {},
     renderError() {},
   };
@@ -208,4 +205,119 @@ test('page overflow refresh clamps and refetches without completing stale data',
   assertEqual(App.state.runtime.currentPage, 1);
   assertDeepEqual(completed, ['page:true']);
   assertDeepEqual(renderedMessages, ['hello']);
+});
+
+
+function apiFixture() {
+  const App = loadApp({}, ['core.js', 'state.js', 'query.js', 'api.js']);
+  const renders = [];
+  App.render = {
+    renderLogs(rows) { renders.push(rows); }, renderMetrics() { App.__metricUpdates = (App.__metricUpdates || 0) + 1; },
+    renderPagination() {}, renderConnectionPill() {}, renderError() {},
+  };
+  App.polling = { onRefreshDispatched() {}, onRefreshCompleted() {} };
+  App.toasts = { error(message) { App.__error = message; } };
+  return { App, renders };
+}
+
+function deferredFetches(App) {
+  const requests = [];
+  App.__testContext.fetch = (_url, options) => new Promise((resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    requests.push({
+      signal: options.signal,
+      respond(text) { resolve({ ok: true, text: async () => text }); },
+    });
+  });
+  return requests;
+}
+
+test('reset cannot publish an old response or cancel the new request deadline', async () => {
+  const { App, renders } = apiFixture();
+  const requests = deferredFetches(App);
+  const old = App.api.dispatchRefresh();
+  requests[0].respond('{"_msg":"old"}');
+  await new Promise((resolve) => setImmediate(resolve));
+  App.api.abortActiveRequest();
+  App.state.resetToDefaults();
+  const next = App.api.dispatchRefresh();
+  const deadline = App.state.runtime.request.timeoutId;
+  assertEqual((await old).stale, true);
+  assertEqual(renders.length, 0);
+  assertEqual(App.state.runtime.request.timeoutId, deadline);
+  requests[2].respond('{"_msg":"new"}'); requests[3].respond('{"c":1}');
+  await next;
+  assertEqual(renders[0][0]._msg, 'new');
+  assertEqual(App.__metricUpdates, 1);
+});
+
+test('manual refresh supersedes an active request and busy polls do not preempt it', async () => {
+  const { App, renders } = apiFixture();
+  const requests = deferredFetches(App);
+  const old = App.api.dispatchRefresh();
+  assertEqual((await App.api.dispatchRefresh('poll')).reason, 'busy');
+  const next = App.api.dispatchRefresh();
+  assertEqual(requests[0].signal.aborted, true);
+  assertEqual((await old).stale, true);
+  requests[2].respond('{"_msg":"new"}'); requests[3].respond('{"c":1}');
+  await next;
+  assertEqual(renders.length, 1);
+});
+
+test('invalid response rows and count shapes fail without inventing totals', async () => {
+  const { App } = apiFixture();
+  for (const body of ['null', '[]', '"text"', '42']) {
+    App.__testContext.fetch = async () => ({ ok: true, text: async () => body });
+    let rejected = false;
+    try { await App.api.runQuery('*'); } catch { rejected = true; }
+    assertEqual(rejected, true, body);
+  }
+  for (const c of [null, -1, 1.5, 'bad', [], {}, Number.MAX_SAFE_INTEGER + 1]) {
+    App.__testContext.fetch = async (_url, options) => ({ ok: true, text: async () => decodeURIComponent(options.body).includes('stats count()') ? JSON.stringify({ c }) : '{"_msg":"valid"}' });
+    const result = await App.api.dispatchRefresh();
+    assertEqual(result.partial, true);
+    assertEqual(App.state.runtime.totalCount, null);
+    assertEqual(App.state.runtime.connection.kind, 'err');
+  }
+});
+
+test('count timeout preserves available logs but reports an unknown count and partial failure', async () => {
+  const { App, renders } = apiFixture();
+  const requests = deferredFetches(App);
+  let timeout;
+  App.__testContext.setTimeout = (callback) => { timeout = callback; return 1; };
+  App.__testContext.clearTimeout = () => {};
+  const refresh = App.api.dispatchRefresh();
+  requests[0].respond('{"_msg":"available"}');
+  await new Promise((resolve) => setImmediate(resolve));
+  timeout();
+  const result = await refresh;
+  assertEqual(result.ok, false); assertEqual(result.partial, true); assertEqual(result.timedOut, true);
+  assertEqual(App.state.runtime.totalCount, null);
+  assertEqual(App.state.runtime.connection.kind, 'err');
+  assertEqual(App.__error, 'Log count request timed out');
+  assertEqual(renders[0][0]._msg, 'available');
+});
+
+test('new query scope invalidates the old count even if logs fail', async () => {
+  const { App } = apiFixture();
+  App.__testContext.fetch = async (_url, options) => ({ ok: true, text: async () => decodeURIComponent(options.body).includes('stats count()') ? '{"c":30}' : '{"_msg":"ok"}' });
+  await App.api.dispatchRefresh();
+  assertEqual(App.state.runtime.totalCount, 30);
+  App.state.runtime.committedSearch = 'different';
+  App.__testContext.fetch = async () => { throw new Error('offline'); };
+  await App.api.dispatchRefresh();
+  assertEqual(App.state.runtime.totalCount, null);
+});
+
+test('background startup and hidden rescheduling cannot create polling timers', () => {
+  const App = loadApp({ aerolog_logview: JSON.stringify({ pollint: '5' }) }, ['core.js', 'state.js', 'polling.js']);
+  App.dom.byId = () => null;
+  App.render = { renderConnectionPill() {} };
+  App.__testContext.document.hidden = true;
+  App.polling.scheduleFrom(Date.now());
+  App.polling.onRefreshDispatched('init', Date.now());
+  assertEqual(App.state.runtime.polling.timerId, null);
+  assertEqual(App.state.runtime.polling.nextPollAt, 0);
+  assertEqual(App.state.config.logview.pollint, '5');
 });

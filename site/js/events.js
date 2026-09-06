@@ -19,6 +19,9 @@
   }
 
   function bindStaticEvents() {
+    document.addEventListener('input', (event) => {
+      if (event.target.tagName === 'TEXTAREA') App.modals.fitTextarea(event.target);
+    });
     const searchInput = dom.byId('search');
     searchInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -84,6 +87,7 @@
     }
 
     document.addEventListener('keydown', (event) => {
+      App.modals.containFocus(event);
       if (event.key !== 'Escape') return;
       const target = event.target;
       const tag = target && target.tagName;
@@ -92,7 +96,8 @@
       if (typing && typeof target.blur === 'function') target.blur();
       App.queryHistory.close();
       if (App.fieldFilters) App.fieldFilters.close();
-      Object.values(OVERLAY_CLOSE).forEach((closeFn) => closeFn());
+      const overlay = dom.qa('.modal-overlay.open').pop();
+      if (overlay) OVERLAY_CLOSE[overlay.id]();
     });
 
     window.addEventListener('resize', () => {
@@ -100,6 +105,7 @@
       if (bindStaticEvents.resizeFrame) return;
       bindStaticEvents.resizeFrame = requestAnimationFrame(() => {
         bindStaticEvents.resizeFrame = null;
+        dom.qa('.modal-overlay.open').forEach((overlay) => App.modals.fitTextareas(overlay.id));
         App.render.updateTabOverflow();
         App.render.renderPagination();
       });
@@ -143,13 +149,13 @@
     'reset-config': () => App.modals.resetConfig(),
     'open-tab-modal': () => App.tabs.openTabModal(),
     'close-tab-modal': () => App.tabs.closeTabModal(),
-    'activate-tab': (target) => App.tabs.activateTab(Number(target.dataset.tabId)),
+    'activate-tab': (target) => App.actions.activateTab(Number(target.dataset.tabId)),
     'open-tab-edit': (target) => App.tabs.openTabEdit(Number(target.dataset.tabId)),
     'close-tab-edit': () => App.tabs.closeTabEdit(),
     'add-tab': () => App.tabs.addTab(),
     'save-tab-edit': () => App.tabs.saveTabEdit(),
     'delete-tab': () => App.tabs.deleteTabFromEdit(),
-    'move-tab': (target) => App.tabs.moveTab(Number(target.dataset.tabId), Number(target.dataset.direction)),
+    'move-tab': (target) => App.actions.moveTab(Number(target.dataset.tabId), Number(target.dataset.direction)),
     'open-aliases': () => App.aliases.openAliasesModal(),
     'close-aliases': () => App.aliases.closeAliasesModal(),
     'save-aliases': () => App.aliases.saveAliases(),

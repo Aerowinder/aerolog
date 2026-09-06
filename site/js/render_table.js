@@ -18,20 +18,26 @@
     return `<span class="msg-content">${utils.escapeHtml(log._msg || '')}</span>`;
   }
 
-  function renderPriority(log) {
+  function priorityValue(log) {
     const raw = log.severity;
-    if (raw == null || raw === '') return '<span class="pri-info">-</span>';
-    const num = parseInt(raw, 10);
-    if (Number.isNaN(num)) return utils.escapeHtml(String(raw));
-    const label = App.SEVERITY_SHORT[num] || String(num);
-    const cls = App.SEVERITY_CLASS[num] || 'pri-info';
-    return `<span class="${cls}">${label}(${num})</span>`;
+    if (raw == null || raw === '') return { text: '-', className: 'pri-info' };
+    const num = Number(raw);
+    if (!Number.isInteger(num)) return { text: String(raw), className: '' };
+    return { text: `${App.SEVERITY_SHORT[num] || num}(${num})`, className: App.SEVERITY_CLASS[num] || 'pri-info' };
+  }
+
+  function facilityValue(log) {
+    if (log.facility_keyword) return String(log.facility_keyword);
+    return log.facility != null && log.facility !== '' ? String(log.facility) : '-';
+  }
+
+  function renderPriority(log) {
+    const value = priorityValue(log);
+    return `<span class="${value.className}">${utils.escapeHtml(value.text)}</span>`;
   }
 
   function renderFacility(log) {
-    if (log.facility_keyword) return utils.escapeHtml(log.facility_keyword);
-    if (log.facility != null && log.facility !== '') return utils.escapeHtml(String(log.facility));
-    return '-';
+    return utils.escapeHtml(facilityValue(log));
   }
 
   const COLUMN_BEHAVIOR = {
@@ -45,22 +51,11 @@
     },
     priority: {
       render: renderPriority,
-      copy(log) {
-        const raw = log.severity;
-        if (raw == null || raw === '') return '-';
-        const num = parseInt(raw, 10);
-        if (Number.isNaN(num)) return String(raw);
-        const label = App.SEVERITY_SHORT[num] || String(num);
-        return `${label}(${num})`;
-      },
+      copy(log) { return priorityValue(log).text; },
     },
     facility: {
       render: renderFacility,
-      copy(log) {
-        if (log.facility_keyword) return String(log.facility_keyword);
-        if (log.facility != null && log.facility !== '') return String(log.facility);
-        return '-';
-      },
+      copy: facilityValue,
     },
     app_name: {
       render: renderAppName,
@@ -159,8 +154,7 @@
 
   function filterDetailAttrs(key, value, index) {
     if (App.state.config.settings.logtable.filter === false) return '';
-    if (key === '_time' || key === '_msg' || value == null || value === '') return '';
-    if (key !== 'facility' && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return '';
+    if (!App.fieldFilters.canFilterDetail(key, value)) return '';
     return ` data-filter-row="${index}" data-filter-field="${utils.escapeHtml(key)}" title="Click to filter by ${utils.escapeHtml(key)}"`;
   }
 
@@ -235,18 +229,21 @@
     return true;
   }
 
-  function copyRow(index) {
+  async function copyRow(index) {
     const log = App.state.runtime.currentLogs[index];
     if (!log) return;
     const text = App.COLUMN_ORDER.map((columnId) => getCopyValue(columnId, log)).join('\t');
-    navigator.clipboard.writeText(text).then(() => {
+    try {
+      await navigator.clipboard.writeText(text);
       const row = dom.q(`tr[data-row-index="${index}"]`);
       if (row) {
         row.classList.add('copied');
         setTimeout(() => row.classList.remove('copied'), 400);
       }
       App.toasts.success('Row copied');
-    }).catch(() => App.toasts.error('Could not copy row'));
+    } catch {
+      App.toasts.error('Could not copy row');
+    }
   }
 
   Object.assign(App.render, {
@@ -257,7 +254,4 @@
     collapseAllRows,
   });
 
-  Object.assign(App.renderInternals, {
-    getCopyValue,
-  });
 })();

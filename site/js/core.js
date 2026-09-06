@@ -1,7 +1,7 @@
 (function () {
   const App = window.Aerolog = window.Aerolog || {};
 
-  App.VERSION = '1.31';
+  App.VERSION = '1.32';
 
   App.COLUMN_DEFS = {
     '_time':    { label: 'Timestamp', width: 220, exportKey: 'time',     className: 'ts'   },
@@ -162,11 +162,8 @@
     hasWildcard(value) {
       return String(value || '').includes('*');
     },
-    escapeLogsQlString(value) {
-      return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    },
     quoteLogsQlValue(value) {
-      return `"${App.utils.escapeLogsQlString(value)}"`;
+      return JSON.stringify(String(value));
     },
     uniq(items) {
       return Array.from(new Set(items));
@@ -334,7 +331,7 @@
         const id = Number(tab && tab.id);
         const name = String(tab && tab.name || '').trim();
         const hosts = Array.isArray(tab && tab.hosts) ? App.validators.hostList(tab.hosts) : [];
-        if (!Number.isFinite(id) || !name || seen.has(id)) continue;
+        if (!Number.isSafeInteger(id) || id <= 0 || !name || seen.has(id)) continue;
         seen.add(id);
         out.push({ id, name, hosts });
       }

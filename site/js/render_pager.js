@@ -24,18 +24,19 @@
 
   function renderPagerMeta(metrics = App.renderInternals.metricSnapshot()) {
     const currentPage = App.state.runtime.currentPage;
-    const totalPages = App.state.runtime.totalPages;
+    const totalPages = App.state.runtime.totalCount === null ? '?' : App.state.runtime.totalPages;
     const text = App.isMobileMode()
       ? `Page ${currentPage}/${totalPages} - ${metrics.logs} Logs (${metrics.timeRange}) - ${metrics.response} API - ${metrics.render} UI`
       : `Page ${currentPage} of ${totalPages} - ${metrics.logs} Logs (${metrics.timeRange}) - ${metrics.response} API - ${metrics.render} UI`;
     dom.byId('pager-meta').textContent = text;
   }
 
-  function renderPagination() {
+  function renderPagination(includeMeta = true) {
     const currentPage = App.state.runtime.currentPage;
     const totalPages = App.state.runtime.totalPages;
-    const visiblePageButtons = pageButtonCount();
-    renderPagerMeta();
+    const countUnknown = App.state.runtime.totalCount === null;
+    const visiblePageButtons = countUnknown ? 0 : pageButtonCount();
+    if (includeMeta) renderPagerMeta();
     let start = Math.max(1, currentPage - Math.floor(visiblePageButtons / 2));
     let end = Math.min(totalPages, start + visiblePageButtons - 1);
     if (end - start + 1 < visiblePageButtons) {
@@ -49,7 +50,7 @@
       buttons.push(make(page, page, page === currentPage ? 'active' : '', `title="Page ${page} of ${totalPages}"`));
     }
     buttons.push(make(currentPage + 1, '›', '', `${currentPage === totalPages ? 'disabled' : ''} title="Next page"`));
-    buttons.push(make(totalPages, '»', '', `${currentPage === totalPages ? 'disabled' : ''} title="Last page"`));
+    buttons.push(make(totalPages, '»', '', `${countUnknown || currentPage === totalPages ? 'disabled' : ''} title="Last page"`));
     dom.byId('pager-buttons').innerHTML = buttons.join('');
   }
 

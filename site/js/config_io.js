@@ -74,14 +74,15 @@
     if (!config || typeof config !== 'object' || Array.isArray(config)) {
       throw new Error('Config must be a JSON object');
     }
-    const importVersion = config.settings_version != null ? Number(config.settings_version) : App.SETTINGS_VERSION;
-    if (!Number.isFinite(importVersion) || importVersion < 100) {
+    const importVersion = Number(config.settings_version);
+    if (!Number.isSafeInteger(importVersion) || importVersion < 100) {
       throw new Error(`Unsupported settings version: ${config.settings_version}`);
     }
     App.settingsMigration.migrate(config, importVersion);
     const settings = config.settings && typeof config.settings === 'object' && !Array.isArray(config.settings) ? config.settings : {};
     const logview = config.logview && typeof config.logview === 'object' && !Array.isArray(config.logview) ? config.logview : {};
 
+    const previousServer = App.state.config.settings.server;
     const nextConfig = App.utils.clone(App.state.config);
     const settingsCfg = nextConfig.settings;
     const logviewCfg = nextConfig.logview;
@@ -101,7 +102,7 @@
     if (logview.rowcount != null) { logviewCfg.rowcount = App.validators.rowcount(logview.rowcount); logviewDirty = true; }
     if (logview.pollint != null) { logviewCfg.pollint = App.validators.pollint(logview.pollint); logviewDirty = true; }
     if (logview.timerange != null) { logviewCfg.timerange = App.validators.timerange(logview.timerange); logviewDirty = true; }
-    if (logview.timecustom != null) { logviewCfg.timecustom = App.validators.timecustom(logview.timecustom); logviewDirty = true; }
+    if (logview.timecustom != null || logview.timerange != null) { logviewCfg.timecustom = App.validators.timecustom(logview.timecustom); logviewDirty = true; }
     if (logview.colwidths != null) { logviewCfg.colwidths = App.validators.colwidths(importColumnWidths(logview.colwidths)); logviewDirty = true; }
     if (config.tabs != null) {
       nextConfig.tabs = App.validators.tabs(config.tabs);
@@ -117,21 +118,19 @@
     const importedDefaultQuery = config.querydef != null ? App.validators.querydef(config.querydef) : '';
     // Normalize imported history against only the imported default query, not a stale current one.
     // If the imported default is not present in history, drop it rather than creating a ghost startup query.
-    if (config.querydef != null) {
+    if (config.querydef != null || config.queryhist != null) {
       nextConfig.querydef = '';
       querydefDirty = true;
     }
     if (config.queryhist != null) {
       nextConfig.queryhist = App.validators.queryhist(config.queryhist, importedDefaultQuery);
       queryhistDirty = true;
-      if (nextConfig.querydef && !nextConfig.queryhist.some((entry) => entry.query === nextConfig.querydef)) {
-        nextConfig.querydef = '';
-        querydefDirty = true;
-      }
     }
     if (config.querydef != null) {
       const defaultIndex = nextConfig.queryhist.findIndex((entry) => entry.query === importedDefaultQuery);
       nextConfig.querydef = defaultIndex === -1 ? '' : importedDefaultQuery;
+      nextConfig.queryhist = App.validators.queryhist(nextConfig.queryhist, nextConfig.querydef);
+      queryhistDirty = true;
     }
 
     if (nextConfig.logview.timerange === 'custom'
@@ -143,12 +142,14 @@
     // All validation completes before any runtime state or localStorage group changes.
     App.state.config = nextConfig;
     App.state.rebuildAliasReverse();
-    if (settingsDirty) App.state.writeGroup('settings');
-    if (logviewDirty) App.state.writeGroup('logview');
-    if (tabsDirty) App.state.writeGroup('tabs');
-    if (aliasesDirty) App.state.writeGroup('aliases');
-    if (queryhistDirty) App.state.writeGroup('queryhist');
-    if (querydefDirty) App.state.writeGroup('querydef');
+    const groups = { settings: settingsDirty, logview: logviewDirty, tabs: tabsDirty, aliases: aliasesDirty, queryhist: queryhistDirty, querydef: querydefDirty };
+    const saved = Object.entries(groups).filter(([, dirty]) => dirty).map(([group]) => App.state.writeGroup(group));
+    if (nextConfig.settings.server !== previousServer) App.state.runtime.polling.pausedForServerChange = true;
+    App.state.runtime.activeTabId = 0;
+    App.state.runtime.editingTabId = null;
+    App.state.runtime.totalCount = null;
+    App.state.runtime.totalPages = 1;
+    App.state.runtime.importSaved = saved.every(Boolean);
     if (themeApplied) App.utils.applyDocumentTheme(themeApplied, true);
     App.state.runtime.currentPage = 1;
     return App.state.config;

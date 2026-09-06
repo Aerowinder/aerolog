@@ -2,8 +2,16 @@
   const App = window.Aerolog;
   const { DEFAULTS, STORAGE_KEYS, validators, utils } = App;
 
+  function readRaw(key) {
+    try { return localStorage.getItem(key); }
+    catch (err) {
+      console.error(`[aerolog] failed to read ${key}:`, err);
+      return null;
+    }
+  }
+
   function parseJsonItem(key, fallback) {
-    const raw = localStorage.getItem(key);
+    const raw = readRaw(key);
     return raw == null ? fallback : utils.parseJson(raw, fallback);
   }
 
@@ -12,7 +20,7 @@
     const logview = validators.logview(parseJsonItem(STORAGE_KEYS.logview, null));
     const aliases = validators.aliases(parseJsonItem(STORAGE_KEYS.aliases, null));
     const tabs = validators.tabs(parseJsonItem(STORAGE_KEYS.tabs, null));
-    const querydef = validators.querydef(localStorage.getItem(STORAGE_KEYS.querydef) ?? '');
+    const querydef = validators.querydef(readRaw(STORAGE_KEYS.querydef) ?? '');
     const queryhist = validators.queryhist(parseJsonItem(STORAGE_KEYS.queryhist, null), querydef);
     if (logview.timerange === 'custom' && (!logview.timecustom.start || !logview.timecustom.end)) {
       logview.timerange = DEFAULTS.logview.timerange;
@@ -27,7 +35,9 @@
       editingTabId: null,
       currentPage: 1,
       totalPages: 1,
-      totalCount: 0,
+      totalCount: null,
+      countScope: null,
+      importSaved: true,
       currentLogs: [],
       committedSearch: config ? config.querydef : '',
       invalidSearchQuery: null,
@@ -44,6 +54,7 @@
         controller: null,
         cause: null,
         timeoutId: null,
+        timedOut: false,
       },
       polling: {
         timerId: null,
@@ -145,15 +156,15 @@
   }
 
   const GROUP_WRITERS = {
-    settings() { writeRaw(STORAGE_KEYS.settings, JSON.stringify(App.state.config.settings)); },
-    logview() { writeRaw(STORAGE_KEYS.logview, JSON.stringify(App.state.config.logview)); },
-    aliases() { writeRaw(STORAGE_KEYS.aliases, JSON.stringify(App.state.config.aliases)); },
-    tabs() { writeRaw(STORAGE_KEYS.tabs, JSON.stringify(App.state.config.tabs)); },
+    settings() { return writeRaw(STORAGE_KEYS.settings, JSON.stringify(App.state.config.settings)); },
+    logview() { return writeRaw(STORAGE_KEYS.logview, JSON.stringify(App.state.config.logview)); },
+    aliases() { return writeRaw(STORAGE_KEYS.aliases, JSON.stringify(App.state.config.aliases)); },
+    tabs() { return writeRaw(STORAGE_KEYS.tabs, JSON.stringify(App.state.config.tabs)); },
     querydef() {
       const value = App.state.config.querydef;
-      writeRaw(STORAGE_KEYS.querydef, value ? value : null);
+      return writeRaw(STORAGE_KEYS.querydef, value ? value : null);
     },
-    queryhist() { writeRaw(STORAGE_KEYS.queryhist, JSON.stringify(App.state.config.queryhist)); },
+    queryhist() { return writeRaw(STORAGE_KEYS.queryhist, JSON.stringify(App.state.config.queryhist)); },
   };
   App.state.writeGroup = (key) => GROUP_WRITERS[key]();
 
@@ -240,6 +251,15 @@
     utils.applyDocumentTheme(App.state.config.settings.theme, true);
   };
 
+  if (typeof window.matchMedia === 'function') {
+    const systemTheme = window.matchMedia('(prefers-color-scheme: light)');
+    const updateSystemTheme = () => {
+      utils.disableThemeTransitionsTemporarily();
+      document.documentElement.setAttribute('data-system-theme', systemTheme.matches ? 'light' : 'dark');
+    };
+    systemTheme.addEventListener('change', updateSystemTheme);
+    updateSystemTheme();
+  }
   App.state.rebuildAliasReverse();
   utils.applyDocumentTheme(App.state.config.settings.theme, false);
 })();

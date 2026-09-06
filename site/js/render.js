@@ -53,13 +53,12 @@
         ? `${App.utils.formatTime(range.start)} to ${App.utils.formatTime(range.end)}`
         : 'Edit custom time range';
     }
-    dom.byId('search').value = App.state.runtime.committedSearch;
   }
 
   function markSearchInvalid(query) {
     const search = dom.byId('search');
     App.state.runtime.invalidSearchQuery = query;
-    if (!search) return;
+    if (!search || search.value !== query) return;
     search.classList.add('invalid-query');
     search.setAttribute('aria-invalid', 'true');
   }
@@ -98,7 +97,7 @@
 
   function metricSnapshot() {
     return {
-      logs: Number(App.state.runtime.totalCount).toLocaleString(),
+      logs: App.state.runtime.totalCount === null ? '?' : Number(App.state.runtime.totalCount).toLocaleString(),
       timeRange: timeRangeText(),
       response: responseTimeText(),
       render: renderTimeText(),
@@ -111,18 +110,6 @@
     dom.byId('stat-resp').innerHTML = `<b>${metrics.response}</b> API`;
     dom.byId('stat-render').innerHTML = `<b>${metrics.render}</b> UI`;
     if (App.render.renderPagerMeta) App.render.renderPagerMeta(metrics);
-  }
-
-  function renderStats() {
-    renderMetrics();
-  }
-
-  function renderResponseTime() {
-    renderMetrics();
-  }
-
-  function renderRenderTime() {
-    renderMetrics();
   }
 
   function renderError(message) {
@@ -146,6 +133,8 @@
 
   function renderAllStatic() {
     dom.byId('version-text').textContent = App.VERSION;
+    dom.byId('search').value = App.state.runtime.committedSearch;
+    clearSearchInvalid();
     document.documentElement.setAttribute('data-message-lines', App.state.config.settings.logtable.msglines);
     renderToolbarState();
     renderThemeButtons();
@@ -154,10 +143,8 @@
     renderHostnameFallbackControls();
     App.render.renderTableHeader();
     App.render.renderTabs();
-    App.render.renderPagination();
-    renderStats();
-    renderResponseTime();
-    renderRenderTime();
+    App.render.renderPagination(false);
+    renderMetrics();
     renderConnectionPill();
   }
 
@@ -171,19 +158,13 @@
     markSearchInvalid,
     clearSearchInvalid,
     clearSearchInvalidOnEdit,
-    renderStats,
     renderMetrics,
-    renderResponseTime,
-    renderRenderTime,
     renderError,
     renderConnectionPill,
     renderAllStatic,
   };
 
   App.renderInternals = {
-    timeRangeText,
     metricSnapshot,
-    responseTimeText,
-    renderTimeText,
   };
 })();

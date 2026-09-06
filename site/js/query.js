@@ -20,27 +20,44 @@
 
   function createQuoteTracker(query) {
     let index = 0;
-    let insideQuote = false;
+    let quote = '';
     let escaped = false;
-
-    // Forward-only tracker; callers must ask about monotonically increasing indexes.
     return function isInsideQuotedString(targetIndex) {
       for (; index < targetIndex; index += 1) {
         const char = query[index];
-        if (escaped) {
-          escaped = false;
-        } else if (char === '\\') {
-          escaped = true;
-        } else if (char === '"') {
-          insideQuote = !insideQuote;
-        }
+        if (escaped) escaped = false;
+        else if (quote && quote !== '`' && char === '\\') escaped = true;
+        else if (quote && char === quote) quote = '';
+        else if (!quote && /["'`]/.test(char)) quote = char;
       }
-      return insideQuote;
+      return Boolean(quote);
     };
   }
 
+  // Only top-level pipes separate the filter from its pipeline. Quoted pipes
+  // and subqueries must remain part of the original expression.
+  function splitPipeline(query) {
+    const insideQuote = createQuoteTracker(query);
+    let depth = 0;
+    for (let index = 0; index < query.length; index += 1) {
+      if (insideQuote(index) || /["'`]/.test(query[index])) continue;
+      const char = query[index];
+      if ('([{'.includes(char)) depth += 1;
+      else if (')]}'.includes(char)) depth = Math.max(0, depth - 1);
+      else if (char === '|' && depth === 0) {
+        return { filter: query.slice(0, index).trim(), pipeline: query.slice(index) };
+      }
+    }
+    return { filter: query.trim(), pipeline: '' };
+  }
+
+  function appendFilter(query, clause) {
+    const { filter, pipeline } = splitPipeline(String(query || ''));
+    return [filter ? `(${filter})` : '', clause, pipeline].filter(Boolean).join(' ');
+  }
+
   function isTokenLead(char) {
-    return char === '' || /[\s(,)]/.test(char);
+    return char === '' || /[\s(,)!-]/.test(char);
   }
 
   function findFriendlyFieldAt(query, index) {
@@ -66,30 +83,57 @@
   }
 
   function readQuotedValue(query, index) {
-    if (query[index] !== '"') return null;
-    let cursor = index + 1;
-    let escaped = false;
+    const quote = query[index];
+    if (!quote || !/["'`]/.test(quote)) return null;
     let value = '';
-    for (; cursor < query.length; cursor += 1) {
+    const bytes = [];
+    const flush = () => {
+      for (const byte of new TextEncoder().encode(value)) bytes.push(byte);
+      value = '';
+    };
+    for (let cursor = index + 1; cursor < query.length; cursor += 1) {
       const char = query[cursor];
-      if (escaped) {
-        value += char;
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-        value += char;
-      } else if (char === '"') {
-        return { quoted: true, value, suffix: '', cursor: cursor + 1 };
-      } else {
-        value += char;
+      if (char === quote) {
+        if (bytes.length) {
+          flush();
+          try { value = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes)); }
+          catch { return null; }
+        }
+        return { quoted: true, value, literal: query.slice(index, cursor + 1), suffix: '', cursor: cursor + 1 };
       }
+      if (char !== '\\' || quote === '`') {
+        value += char;
+        continue;
+      }
+      const escape = query[++cursor];
+      const escapes = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v', '\\': '\\', '"': '"', "'": "'" };
+      if (Object.prototype.hasOwnProperty.call(escapes, escape)) {
+        value += escapes[escape];
+        continue;
+      }
+      const digits = escape === 'x' ? 2 : escape === 'u' ? 4 : escape === 'U' ? 8 : /[0-7]/.test(escape || '') ? 3 : 0;
+      const octal = digits === 3;
+      const start = octal ? cursor : cursor + 1;
+      const number = query.slice(start, start + digits);
+      if (!digits || number.length !== digits || !(octal ? /^[0-7]+$/ : /^[0-9a-f]+$/i).test(number)) return null;
+      const code = parseInt(number, octal ? 8 : 16);
+      if (code > (octal ? 255 : 0x10ffff) || (code >= 0xd800 && code <= 0xdfff)) return null;
+      if (octal || escape === 'x') { flush(); bytes.push(code); }
+      else value += String.fromCodePoint(code);
+      cursor = start + digits - 1;
     }
     return null;
   }
 
   function readUnquotedValue(query, index) {
     let cursor = index;
-    while (cursor < query.length && !/\s/.test(query[cursor])) cursor += 1;
+    let depth = 0;
+    while (cursor < query.length && !/\s/.test(query[cursor])) {
+      if (query[cursor] === '|' && depth === 0) break;
+      if (query[cursor] === '(') depth += 1;
+      if (query[cursor] === ')') depth = Math.max(0, depth - 1);
+      cursor += 1;
+    }
     if (cursor === index) return null;
     const valueParts = splitUnquotedValue(query.slice(index, cursor));
     return {
@@ -109,8 +153,8 @@
     const afterAlias = aliasIndex + alias.length;
     const operatorParts = readFriendlyOperator(query, afterAlias);
     if (!operatorParts) return null;
-    if (query[operatorParts.cursor] === '"' && !readQuotedValue(query, operatorParts.cursor)) return null;
-    const valueParts = readQuotedValue(query, operatorParts.cursor) || readUnquotedValue(query, operatorParts.cursor);
+    const quoted = /["'`]/.test(query[operatorParts.cursor] || '');
+    const valueParts = quoted ? readQuotedValue(query, operatorParts.cursor) : readUnquotedValue(query, operatorParts.cursor);
     if (!valueParts) return null;
     return {
       token: {
@@ -119,6 +163,7 @@
         alias: query.slice(aliasIndex, afterAlias),
         operator: operatorParts.operator,
         quoted: valueParts.quoted,
+        literal: valueParts.literal,
         value: valueParts.value,
       },
       suffix: valueParts.suffix,
@@ -154,20 +199,22 @@
     return fallback && fallback.enabled !== false ? fallback.field : '';
   }
 
-  function buildHostMatchClause(value, operator) {
-    const hostnameClause = `hostname${operator}${utils.quoteLogsQlValue(value)}`;
+  function buildHostMatchClause(value, operator, literal) {
+    const hostnameClause = `hostname${operator}${literal || utils.quoteLogsQlValue(value)}`;
     const fallbackField = hostnameFallbackField();
     if (!fallbackField) return hostnameClause;
-    const fallbackClause = `${fallbackField}${operator}${utils.quoteLogsQlValue(value)}`;
+    const fallbackClause = `${fallbackField}${operator}${literal || utils.quoteLogsQlValue(value)}`;
     return `(${hostnameClause} OR (hostname:"" AND ${fallbackClause}))`;
   }
 
-  function compileHostClause(value, operator = ':') {
-    const trimmed = String(value || '').trim();
-    if (!trimmed) return '';
-    if (operator === ':=') return buildExactHostnameClause(trimmed);
-    if (operator === ':~') return buildHostMatchClause(trimmed, ':~');
-    if (!utils.hasWildcard(trimmed)) return buildExactHostnameClause(trimmed);
+  function compileHostClause(value, operator = ':', literal) {
+    const trimmed = literal ? String(value) : String(value ?? '').trim();
+    if (!trimmed && !literal) return '';
+    if (operator === ':~') return buildHostMatchClause(trimmed, ':~', literal);
+    if (operator === ':=' || !utils.hasWildcard(trimmed)) {
+      const resolved = resolveExactHost(trimmed);
+      return buildHostMatchClause(resolved, ':=', resolved === trimmed ? literal : undefined);
+    }
 
     const clauses = [buildHostMatchClause(utils.wildcardToRegex(trimmed), ':~')];
     for (const raw of getAliasWildcardMatches(trimmed)) {
@@ -177,18 +224,18 @@
     return clauses.length === 1 ? clauses[0] : `(${clauses.join(' OR ')})`;
   }
 
-  function compileFieldClause(target, value, operator = ':', wasQuoted = false) {
-    const trimmed = String(value || '').trim();
-    if (!trimmed) return '';
+  function compileFieldClause(target, value, operator = ':', wasQuoted = false, literal) {
+    const trimmed = wasQuoted ? String(value) : String(value ?? '').trim();
     const formatExact = (raw) => {
       const needsQuotes = wasQuoted || /[\s"*]/.test(raw) || raw === '';
       return needsQuotes ? utils.quoteLogsQlValue(raw) : raw;
     };
+    if (literal && (operator === ':=' || !utils.hasWildcard(trimmed)) && operator !== ':~') return `${target}:=${literal}`;
     if (operator === ':=') {
       return `${target}:=${formatExact(trimmed)}`;
     }
     if (operator === ':~') {
-      return `${target}:~${utils.quoteLogsQlValue(trimmed)}`;
+      return `${target}:~${literal || utils.quoteLogsQlValue(trimmed)}`;
     }
     if (utils.hasWildcard(trimmed)) {
       return `${target}:~${utils.quoteLogsQlValue(utils.wildcardToRegex(trimmed))}`;
@@ -196,10 +243,9 @@
     return `${target}:=${formatExact(trimmed)}`;
   }
 
-  function compileFieldAliasClause(target, value, operator = ':', wasQuoted = false) {
-    const trimmed = String(value || '').trim();
-    if (!trimmed) return '';
-    const renderedValue = wasQuoted ? utils.quoteLogsQlValue(trimmed) : trimmed;
+  function compileFieldAliasClause(target, value, operator = ':', wasQuoted = false, literal) {
+    const trimmed = wasQuoted ? String(value) : String(value ?? '').trim();
+    const renderedValue = literal || (wasQuoted ? utils.quoteLogsQlValue(trimmed) : trimmed);
     return `${target}${operator}${renderedValue}`;
   }
 
@@ -244,12 +290,12 @@
       if (token.type !== 'field' || !token.spec) return token.value || token.lead || '';
       const lead = token.lead || '';
       if (token.spec.kind === App.FIELD_KINDS.HOST) {
-        return `${lead}${compileHostClause(token.value, token.operator)}`;
+        return `${lead}${compileHostClause(token.value, token.operator, token.literal)}`;
       }
       if (token.spec.kind === App.FIELD_KINDS.FIELD_ALIAS) {
-        return `${lead}${compileFieldAliasClause(token.spec.target, token.value, token.operator, token.quoted)}`;
+        return `${lead}${compileFieldAliasClause(token.spec.target, token.value, token.operator, token.quoted, token.literal)}`;
       }
-      return `${lead}${compileFieldClause(token.spec.target, token.value, token.operator, token.quoted)}`;
+      return `${lead}${compileFieldClause(token.spec.target, token.value, token.operator, token.quoted, token.literal)}`;
     }).join('');
   }
 
@@ -281,11 +327,14 @@
     const tabClause = buildTabHostClause();
     if (tabClause) parts.push(tabClause);
     const rewritten = rewriteQuery(App.state.runtime.committedSearch);
-    if (rewritten) parts.push(rewritten);
+    const { filter, pipeline } = splitPipeline(rewritten);
+    if (filter) parts.push(`(${filter})`);
+    if (pipeline) parts.push(pipeline);
     return parts.join(' ');
   }
 
   App.query = {
+    appendFilter,
     tokenizeFriendlyQuery,
     normalizeFriendlyTokens,
     compileFriendlyTokens,

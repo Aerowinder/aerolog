@@ -1,6 +1,6 @@
 {
   "name": "aerolog",
-  "version": "1.31",
+  "version": "1.32",
   "private": true,
   "description": "Lightweight browser frontend for VictoriaLogs.",
   "scripts": {

@@ -60,10 +60,10 @@ Do not add or preserve "just in case" compatibility wrappers, aliases, or fallba
 
 ## 3. Versioning
 
-Aerolog uses semantic versioning starting at `1.00`. Prior builds used caldate versioning (`2026.04.15b`).
+Aerolog uses the user-requested two-component release number (currently `1.32`). Do not reinterpret it as a three-component npm SemVer version. Prior builds used caldate versioning (`2026.04.15b`).
 
 - `App.VERSION` in `core.js` - the display version string
-- `App.SETTINGS_VERSION` in `core.js` - integer checked during config import; mismatched versions are rejected
+- `App.SETTINGS_VERSION` in `core.js` - independent schema integer checked during config import; see §12 for accepted versions
 - `package.json` `version` field - kept in sync with `App.VERSION`
 
 `SETTINGS_VERSION` is bumped only for incompatible config changes that need migration. Additive settings with validator-backed defaults may keep the existing settings version, so older exports gain the new default safely.
@@ -86,7 +86,7 @@ The app started as a single HTML file. That made early experimentation easy but 
 | `actions.js` | user-level action orchestration - the mutate → persist → render/refresh sequencing lives here so workflow modules do not reimplement it |
 | `query.js` | friendly query parsing, field alias normalization, wildcard/exact compilation, alias-aware host clauses |
 | `query_history.js` | recent query history popover, pin/default/remove/clear, default-pinned ordering. Do not fold this back into `render.js` or `state.js` |
-| `render.js` | shared render facade, toolbar state, settings controls, stats, response/render time, connection pill |
+| `render.js` | shared render facade, toolbar state, settings controls, `renderMetrics()` snapshot, connection pill |
 | `render_table.js` | log table rendering, column resize + double-click auto-size, copy button/row visuals, message preview line count, expanded detail rendering |
 | `render_pager.js` | pager button count, pager metadata text, pagination rendering |
 | `render_tabs.js` | tab strip rendering, overflow detection, tab list in Tabs modal |
@@ -113,14 +113,15 @@ The app started as a single HTML file. That made early experimentation easy but 
 - `events.js` last
 
 ### Refresh separation
-- `api.js` - manual/settings/page refreshes run logs + count queries; automatic polls run only the logs query and keep the previous count. Non-empty malformed NDJSON is a request failure, never silently dropped data.
-- All refresh causes have timeouts: polls use the poll interval, other refreshes use `App.REQUEST_TIMEOUT_MS`.
+- `api.js` - manual/settings/page refreshes run logs + count queries; automatic polls run only the logs query and keep the previous count. Non-empty malformed NDJSON or non-object rows are request failures. Count responses require exactly one nonnegative safe integer `c`. A failed count makes `totalCount` null (unknown), never a stale number. Unknown counts disable numbered/last-page navigation; next-page availability uses the loaded row count. Counts are scoped to server and query, while polls retain the last valid count for that scope.
+- All refresh causes have timeouts: polls use the poll interval, other refreshes use `App.REQUEST_TIMEOUT_MS`. A count-only timeout remains a visible partial failure even when rows succeeded.
+- Request arbitration checks both request-object identity and its ID. Reset creates a new runtime object; old continuations must not clear the new deadline or render old data. Explicit abort invalidates the ID.
 
 ### Runtime pauses live in `polling.js`
 `polling.js` owns pause state for page navigation, expanded rows, hidden browser tabs, and server-URL changes. See §8.
 
 ### Click-to-filter targets
-Hostname, severity, facility, app, and safe expanded detail fields are filterable. `_time` and `_msg` are intentionally **not** click-filterable - never turn timestamps or full messages into brittle search-box filters.
+Hostname, severity, facility, app, and safe expanded detail fields are filterable. Click-generated values are exact, including literal stars. `fieldFilters.canFilterDetail` owns expanded-field eligibility; raw names that collide with friendly aliases are quoted. The raw numeric facility detail targets numeric facility even if a keyword is present. `_time` and `_msg` are intentionally **not** click-filterable - never turn timestamps or full messages into brittle search-box filters.
 
 ---
 
@@ -149,7 +150,9 @@ The most bug-prone part of the app. Do **not** regress into a pile of disconnect
 3. resolve aliases where needed
 4. compile to final LogsQL
 
-Quoted strings are literal - do not rewrite friendly fields inside them.
+Recognize double quotes, single quotes, and backticks. Never rewrite friendly fields inside quoted text. Preserve original quoted exact/regex literals, including empty strings, whitespace, and escapes; decode only as needed for aliases/wildcards. Quote raw field names to bypass friendly rewriting.
+
+Group the user filter before combining it with tab/time constraints, so OR cannot escape them. Keep top-level pipes outside the group; quoted pipes and subquery pipes are not separators. Click-to-filter also groups the existing expression and inserts before its pipeline.
 
 ### Friendly field aliases
 `host`, `hostname`, `app`, `application`, `app_name`, `msg`, `message`, `_msg`, `time`, `timestamp`, `_time`, `fac`, `facility`, `facility_keyword`, `facility_num`, `sev` → `severity`.
@@ -179,7 +182,7 @@ Deliberate - matches what the UI displays most of the time.
 These differ intentionally even though both *feel* like message searching.
 
 ### Rejected queries
-Aerolog does not attempt to fully parse LogsQL in the browser. When VictoriaLogs rejects a submitted query with HTTP 400, keep the existing results visible, show an error toast for user-triggered requests, and mark the search input red. The red state applies only to that rejected query and clears as soon as the user edits its text. Automatic polls remain silent so an invalid saved query cannot spam toasts. A 400 is proof that VictoriaLogs responded, not a connection failure: keep the connection pill in its normal active-poll green state.
+Aerolog does not attempt to fully parse LogsQL in the browser. When VictoriaLogs rejects a submitted query with HTTP 400, keep the existing results visible, show an error toast for user-triggered requests, and mark the search input red. The red state applies only when the input still displays that rejected query and clears as soon as the user edits its text. Late rejections must not mark corrected drafts red. General toolbar rendering must not overwrite the search draft; explicit searches and startup/import/reset set the input. Automatic polls remain silent so an invalid saved query cannot spam toasts. A 400 is proof that VictoriaLogs responded, not a connection failure: keep the connection pill in its normal active-poll green state.
 
 ### Host matching - shared matcher rule
 Tabs, aliases, and `host:`/`hostname:` rewrites must all use the **same host matcher/compiler**. Duplicated hostname logic is how earlier wildcard bugs happened.
@@ -209,7 +212,7 @@ Expected behavior:
 Subtle bug territory. Read this before touching polling.
 
 ### Saved-interval rule
-The saved poll interval only changes when the user explicitly picks a new value from the poll interval control. Nothing else - not a pause, not a resume, not a side-effect, not an import handler, not a settings save - may write the saved poll interval. Side-effect pauses live entirely in runtime state.
+The saved poll interval only changes when the user explicitly picks a new value from the poll interval control. Runtime pauses and ordinary settings saves never write the saved poll interval. Deliberate config import is the exception: it restores the exported preference without clearing runtime pauses; changing the imported server adds the server-change pause. Reset restores the default Off preference. Side-effect pauses live entirely in runtime state.
 
 ### Auto-resume rule
 A pause caused by anything other than the user explicitly turning polling off (expanding rows, leaving page 1, changing the server URL, etc.) must **not** silently re-enable polling when the triggering condition clears. Once paused by a side-effect, stay paused until the user picks a poll interval again.
@@ -217,7 +220,7 @@ A pause caused by anything other than the user explicitly turning polling off (e
 **The only thing that resumes auto-polling is the user choosing a poll interval.**
 
 ### Hidden-tab exception
-Background tabs should not keep stale poll timers running. On visibility return, re-anchor polling from the current time if auto-polling is still allowed. Hidden/visible transitions are transparent rather than a user-visible pause, so returning to the tab may resume polling on its own. This is the only exception to the auto-resume rule.
+Background tabs should not keep stale poll timers running. Scheduling and scheduled callbacks check `document.hidden`, including background startup and rescheduling; the visible poll preference/pill still reflects user pause state. On visibility return, re-anchor polling from the current time if auto-polling is still allowed. Hidden/visible transitions are transparent rather than a user-visible pause, so returning to the tab may resume polling on its own. This is the only exception to the auto-resume rule.
 
 ### Per-pause behavior
 - **Page navigation:** leaving page 1 pauses effective auto-polling. Returning to page 1 does not resume.
@@ -245,7 +248,7 @@ Reflects the same poll deadline as the scheduler. Do not let them drift apart - 
 - auto-polls do not run the count query; previous count persists until a manual/settings/page refresh updates it
 
 ### Response-time updates
-Response time updates after every successful refresh, including settings-driven ones - not just auto-polls. Render time is measured separately around Aerolog's synchronous DOM update work; it does not claim to include browser paint/compositing. Easy to get wrong when short poll intervals overlap with user refreshes.
+Response time updates after every successful refresh, including settings-driven ones - not just auto-polls. Render time is measured around synchronous table, pager-button, and connection-pill updates (before the final timing-label update); it does not claim to include browser paint/compositing. Easy to get wrong when short poll intervals overlap with user refreshes.
 
 ### Connection pill
 - Configured host/server value always visible, even on failure.
@@ -254,7 +257,7 @@ Response time updates after every successful refresh, including settings-driven 
 - A rejected HTTP 400 query is not a connection failure; preserve the active-poll green state while the query feedback is shown elsewhere.
 
 ### Header layout
-Keep app identity on the left, compact centered metrics, and connection status plus Settings on the right. Metrics use a two-row grid inside the existing header height: the selected-range Logs metric first, then API and UI. Do not make them a separate header row, so variable server names cannot displace them. Header and pager metrics must render from the same metric snapshot; do not calculate their displayed values independently. Desktop server text stays on one line and ellipsizes only beyond the combined Poll, Rows, and Last control span, after reserving space for Settings and its gap. Mobile keeps a compact single-line pill. The header layout remains active refinement work; preserve this alignment rule while continuing it.
+Keep app identity on the left, compact centered metrics, and connection status plus Settings on the right. Metrics use a two-row grid inside the existing header height: the selected-range Logs metric first, then API and UI. Do not make them a separate header row, so variable server names cannot displace them. Header and pager metrics must render from the same metric snapshot via `App.render.renderMetrics()`. Do not add synonymous stats/response/render-time wrappers. Refresh renders pager buttons without metadata, then updates metrics once. Desktop server text stays on one line and ellipsizes only beyond the combined Poll, Rows, and Last control span, after reserving space for Settings and its gap. Mobile keeps a compact single-line pill. The header layout remains active refinement work; preserve this alignment rule while continuing it.
 
 ---
 
@@ -293,6 +296,8 @@ Rules shortcuts must follow:
 
 Poll, Rows, and Last selections blur immediately after their value is captured, before their refresh action runs. This returns focus to the document so shortcuts work while the refresh is pending; do not make the log table itself focusable just for this.
 
+Opening a modal focuses its dialog container, never its first control. Shared modal helpers own focus placement/restoration, the overlay stack, background `inert` state, and Tab containment. Close helpers are idempotent and unlock only a real scroll lock. Escape closes only the top open overlay; it must not invoke closed-modal side effects. Modal labels must remain associated with their fields.
+
 The cheat sheet is a normal `.modal-overlay` (`#shortcuts-modal`) so it inherits theming and Esc-to-close via the shared `OVERLAY_CLOSE` table. The settings modal includes a "Press `?` for shortcuts" hint.
 
 When changing bindings, update README, `#shortcuts-modal` markup in `index.html`, and the shortcut tests together.
@@ -304,7 +309,7 @@ When changing bindings, update README, `#shortcuts-modal` markup in `index.html`
 Text inputs and textareas intentionally disable mobile autocorrect/autocapitalize/spellcheck/autocomplete because Aerolog fields usually contain hostnames, URLs, aliases, or LogsQL.
 
 ### Theme and startup
-Default theme is **System**. Apply theme before first paint - never hard-code `dark` in the document shell. Avoid staggered/messy theme transitions; suppress transitions during startup/theme flips when needed. First-paint discipline is load-bearing - the modular version felt worse until this was handled properly.
+Default theme is **System**. `data-theme` retains the preference; `data-system-theme` tracks the media query so explicit Light and System Light share one CSS palette. The pre-paint script sets both before CSS loads, and the media-query listener updates system changes. Apply theme before first paint - never hard-code `dark` in the document shell. Avoid staggered/messy theme transitions; suppress transitions during startup/theme flips when needed. First-paint discipline is load-bearing - the modular version felt worse until this was handled properly.
 
 ### Mobile text inflation (iOS)
 Real iPhone-only issue: Message column text rendered much larger than other columns. Did **not** reproduce reliably in desktop devtools mobile emulation. Likely iOS text autosizing / font inflation hitting wrapped message cells.
@@ -339,11 +344,14 @@ Expanded rows show every raw field returned by VictoriaLogs, sorted alphabetical
 
 Expanded detail rows use one shared auto-sized key column (`fit-content(16rem)`) on both desktop and mobile. Do not add a narrower mobile key-column override; long structured field names such as Windows/Event fields need the same readable key width on mobile.
 
+### Modal content sizing
+Aliases and tab-host textareas retain their rows-based minimum and grow with content on open, input, and viewport resize. `App.modals.fitTextarea` reserves space for the other modal controls and caps textarea growth at the existing 90vh modal limit; additional text scrolls inside the textarea. Fit again after switching tab-editor views. Heartbeats uses the outer modal height cap rather than an independent table-height cap. Do not impose a shared viewport-based minimum height on these dialogs.
+
 ### Settings modal
 The server field applies on blur or when the user clicks Done. Pressing Esc while editing the server field restores the saved value before blur handlers run, so the draft is abandoned.
 
 ### Config imports
-Must check `settings_version` before applying. Reject unsupported versions clearly instead of silently applying a shape Aerolog may not understand.
+Must require an explicit integer `settings_version` >= 100 before applying. See §12: future version numbers are intentionally accepted for recognized fields.
 
 ---
 
@@ -375,7 +383,7 @@ Do not fold alias or query-history workflows back into `modals.js`.
 `<site-hostname>-<SETTINGS_VERSION>-YYYYMMDDHHMMSS.json` using local browser time, where the site hostname comes from `window.location.hostname`. If Aerolog is opened without a hostname, fall back to `aerolog-export`. The settings version in the filename lets the user see at a glance which schema a backup was exported from.
 
 ### localStorage keys
-Six grouped JSON blobs that mirror the export/import top-level keys 1:1:
+Six storage keys that correspond to the config groups (five JSON blobs and the plain-string default query):
 
 - `aerolog_settings` - `{ server, theme, tabvis, logtable, fallback }`
 - `aerolog_logview` - `{ rowcount, pollint, timerange, timecustom, colwidths }`
@@ -386,10 +394,10 @@ Six grouped JSON blobs that mirror the export/import top-level keys 1:1:
 
 Internal `App.state.config` uses the same six-key shape. `App.persist` exposes nested leaf setters (e.g. `App.persist.settings.logtable.msglines('3')`, `App.persist.logview.pollint('5')`) that validate, mutate config, and re-serialize the owning group to its single localStorage key. Reach values via `App.state.config.settings.logtable.msglines`, not via a flattened path.
 
-**Sync rule - the three shapes (export JSON, `aerolog_*` localStorage blobs, internal `App.state.config`) must stay identical, keyed the same way at every level.** Adding or renaming a settings field means touching all three together; the sync test in `site/tests/config.test.js` (`internal config, localStorage groups, and export JSON shapes stay in sync`) enforces the top-level shape and sample nested shapes. Extend it when you add new fields.
+**Shape rule:** internal config and localStorage use the same canonical group/leaf names. Export uses those groups, with two deliberate differences: column widths map internal IDs through compact export keys (without the internal `widths` wrapper), and empty `querydef`/`timecustom` are omitted. Adding or renaming a settings field means touching all three together; the sync test in `site/tests/config.test.js` (`internal config, localStorage groups, and export JSON shapes stay in sync`) enforces the top-level shape and sample nested shapes. Extend it when you add new fields.
 
 ### Config import versioning
-Imports with `settings_version` < 100 are rejected (pre-1.00 exports). Versions >= 100 are accepted and run through ordered migration steps registered in `settings_migration.js`. `config_io.applyImportedConfig` calls `App.settingsMigration.migrate(config, importVersion)` after the version check and before applying values, so migrations reshape the raw imported object in place before validators run.
+Unversioned imports, noninteger versions, and `settings_version` < 100 are rejected. Integer versions >= 100 are accepted and run through ordered migration steps registered in `settings_migration.js`. `config_io.applyImportedConfig` calls `App.settingsMigration.migrate(config, importVersion)` after the version check and before applying values, so migrations reshape the raw imported object in place before validators run.
 
 When bumping `SETTINGS_VERSION` with a shape change, append a new step to the `STEPS` array in `settings_migration.js`:
 
@@ -399,10 +407,10 @@ When bumping `SETTINGS_VERSION` with a shape change, append a new step to the `S
 
 Keep each step narrow - only touch the fields that actually changed. Validators still run afterward, so migrations do not need to re-validate values. `settings_migration.js` is the **only** sanctioned place for compatibility handling; do not scatter version-specific coercions into `config_io.js` or validators.
 
-Only current `aerolog_*` keys are supported.
+Only current `aerolog_*` keys are supported. A full backup without `querydef` clears the old default; imported history is normalized with its imported default. A logview import containing `timerange` but no `timecustom` clears the old saved custom range. Import returns to All Logs and clears tab-edit state. Tab IDs must be positive safe integers; 0 is reserved for All Logs.
 
 ### Config import atomicity
-Validate and construct the complete imported config before assigning `App.state.config` or writing any localStorage group. A rejected import must leave the active config unchanged.
+Validate and construct the complete imported config before assigning `App.state.config` or writing any localStorage group. A validation-rejected import must leave the active config unchanged. Storage writes are separate from validation atomicity: group writers return success/failure. If any imported group cannot be saved, retain the applied session config and report incomplete persistence instead of claiming success. Startup reads tolerate unavailable storage.
 
 ### Heartbeats timeout
 Heartbeats uses its own abort controller and the shared `App.REQUEST_TIMEOUT_MS` deadline. It must report a timeout in the modal rather than remain in a loading state indefinitely.
@@ -445,7 +453,7 @@ The sibling `/mnt/git/aerolog-test` Git repository is approved for Aerolog test 
 
 Browser smoke-test page: `site/tests/index.html`.
 
-Tests cover query rewriting, alias-aware host clauses, default-query startup, query-history ordering, config persistence/import helpers, action sequencing, polling/API refresh behavior, and table rendering. They do **not** replace manual UI testing.
+Tests cover query rewriting, alias-aware host clauses, default-query startup, query-history ordering, config persistence/import helpers, action sequencing, polling/API refresh behavior, and table rendering. The runner also executes the browser smoke page's declared scripts/fixture. They do **not** replace manual UI testing. Prefer behavioral assertions and meaningful invariants over exact CSS text, font-size snapshots, or hardcoded current-version checks. Keep display/package/export version synchronization checks dynamic.
 
 ### Manual UI checklist after edits
 
@@ -454,7 +462,7 @@ The checklist below is the residue that Node tests can't reach: real paint timin
 - startup no-flash (non-system theme repaints once, then stays put) - real paint timing, only visible in a browser
 - progress bar aligned with actual poll timing - needs real `element.animate` + real clock
 - no early reset, no double-fire, no back-to-back poll race on settings/time-range/refresh churn
-- Tabs modal reorder + drag interactions (logic is tested; the pointer-level feel isn't)
+- Tabs modal up/down reorder buttons and table-column resize/auto-size interactions
 - expanded detail rendering *visual* (key column width, wrap behavior) on desktop and mobile
 - row copy button stays visually centered on desktop and mobile - CSS layout
 - real-iPhone message text size if you touched message CSS

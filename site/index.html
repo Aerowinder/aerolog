@@ -8,6 +8,7 @@
 <title>Aerolog</title>
 <script>
 (function() {
+  document.documentElement.setAttribute('data-system-theme', window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   try {
     var settings = JSON.parse(localStorage.getItem('aerolog_settings')) || {};
     document.documentElement.setAttribute('data-theme', settings.theme || 'system');
@@ -54,7 +55,7 @@
 
 <div class="toolbar">
   <div class="search-box" id="search-box">
-    <input type="text" id="search" placeholder="search (LogsQL), try: error, app:sshd, severity:&lt;4 (press enter)" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <input type="text" id="search" aria-label="Search logs" placeholder="search (LogsQL), try: error, app:sshd, severity:&lt;4 (press enter)" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
     <button class="search-clear" data-action="clear-search" type="button" title="Clear query" aria-label="Clear query">X</button>
     <button class="search-history-toggle" data-action="toggle-query-history" type="button" aria-expanded="false" aria-controls="query-history-menu" title="Recent queries" aria-label="Recent queries">V</button>
     <div class="query-history-menu" id="query-history-menu"></div>
@@ -62,7 +63,7 @@
   <button class="btn-search" data-action="search">Search</button>
 
   <div class="toolbar-selects">
-    <select class="mini-select" id="poll-interval">
+    <select class="mini-select" id="poll-interval" aria-label="Poll interval">
       <option value="off" selected>Poll: Off</option>
       <option value="1">Poll: 1s</option>
       <option value="5">Poll: 5s</option>
@@ -70,7 +71,7 @@
       <option value="30">Poll: 30s</option>
       <option value="60">Poll: 1m</option>
     </select>
-    <select class="mini-select" id="page-size">
+    <select class="mini-select" id="page-size" aria-label="Rows per page">
       <option value="25">Rows: 25</option>
       <option value="50">Rows: 50</option>
       <option value="100" selected>Rows: 100</option>
@@ -79,7 +80,7 @@
       <option value="1000">Rows: 1000</option>
     </select>
     <div class="time-range-group">
-      <select class="mini-select" id="time-range">
+      <select class="mini-select" id="time-range" aria-label="Time range">
         <option value="5m">Last: 5m</option>
         <option value="15m">Last: 15m</option>
         <option value="30m">Last: 30m</option>
@@ -125,7 +126,7 @@
     </div>
 
     <h4>VictoriaLogs Server</h4>
-    <label>Server URL</label>
+    <label for="server-url">Server URL</label>
     <input type="text" id="server-url" placeholder="localhost:9428" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
     <p class="hint">Address of VictoriaLogs server. HTTPS will be assumed if HTTP is not specified.</p>
 
@@ -208,9 +209,9 @@
       <div id="tab-list"></div>
       <hr class="sep">
       <h4>Add New Tab</h4>
-      <label>Tab name</label>
+      <label for="new-tab-name">Tab name</label>
       <input type="text" id="new-tab-name" placeholder="e.g. Web Servers" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
-      <label>Hostnames (one per line, exact match unless * is used; aliases supported)</label>
+      <label for="new-tab-hosts">Hostnames (one per line, exact match unless * is used; aliases supported)</label>
       <textarea id="new-tab-hosts" placeholder="pve2&#10;web-*&#10;router-01" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
       <div class="modal-actions">
         <button class="btn" data-action="close-tab-modal">Close</button>
@@ -219,9 +220,9 @@
     </div>
 
     <div id="tab-edit-view" style="display: none;">
-      <label>Tab name</label>
+      <label for="edit-tab-name">Tab name</label>
       <input type="text" id="edit-tab-name" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
-      <label>Hostnames (one per line, exact match unless * is used; aliases supported)</label>
+      <label for="edit-tab-hosts">Hostnames (one per line, exact match unless * is used; aliases supported)</label>
       <textarea id="edit-tab-hosts" rows="10" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
       <div class="modal-actions">
         <button class="btn" data-action="close-tab-edit">Back</button>
@@ -236,7 +237,7 @@
 <div class="modal-overlay" id="aliases-modal">
   <div class="modal">
     <h3>Hostname Aliases</h3>
-    <label>Map raw hostnames or IPs to friendly names</label>
+    <label for="aliases-text">Map raw hostnames or IPs to friendly names</label>
     <textarea id="aliases-text" rows="10" placeholder="10.0.0.5 = router-01&#10;192.168.1.50 = firewall&#10;172.16.0.1 = core-switch" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
     <p class="hint">One alias per line, <b>raw = friendly</b>. Aliases apply to the display, search queries, and tabs. Use the friendly name in <code>host:</code> or <code>hostname:</code> filters. Exact matches stay exact; use <code>*</code> when you want fuzzy matching.</p>
     <div class="modal-actions">
@@ -274,9 +275,9 @@
   <div class="modal">
     <h3>Custom Time Range</h3>
     <p class="hint">Choose the local browser time window Aerolog should send to VictoriaLogs.</p>
-    <label>Start</label>
+    <label for="custom-time-start">Start</label>
     <input type="datetime-local" id="custom-time-start" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
-    <label>End</label>
+    <label for="custom-time-end">End</label>
     <input type="datetime-local" id="custom-time-end" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
     <div class="modal-actions">
       <button class="btn" data-action="close-custom-time">Cancel</button>
@@ -304,7 +305,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast">copied</div>
+<div class="toast" id="toast" role="status" aria-live="polite">copied</div>
 
 
 <script src="./js/core.js" defer></script>

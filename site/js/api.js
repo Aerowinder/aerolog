@@ -10,9 +10,7 @@
   }
 
   function malformedResponseError() {
-    const err = new Error('Malformed response from VictoriaLogs');
-    err.malformedResponse = true;
-    return err;
+    return new Error('Malformed response from VictoriaLogs');
   }
 
   function connectionErrorDetail(err) {
@@ -36,7 +34,9 @@
     const rows = [];
     for (const line of text.trim().split('\n').filter(Boolean)) {
       try {
-        rows.push(JSON.parse(line));
+        const row = JSON.parse(line);
+        if (!row || typeof row !== 'object' || Array.isArray(row)) throw malformedResponseError();
+        rows.push(row);
       } catch {
         throw malformedResponseError();
       }
@@ -60,6 +60,7 @@
       request.controller = null;
     }
     request.cause = null;
+    request.id += 1;
   }
 
   function shouldSupersedeActiveRequest(nextCause) {
@@ -72,17 +73,18 @@
     clearRequestTimeout();
     const timeoutMs = cause === 'poll' ? App.derive.pollIntervalMs() : App.REQUEST_TIMEOUT_MS;
     if (!timeoutMs) return;
-    App.state.runtime.request.timeoutId = setTimeout(() => {
-      if (requestId !== App.state.runtime.request.id) return;
-      abortActiveRequest();
+    const request = App.state.runtime.request;
+    request.timeoutId = setTimeout(() => {
+      if (request !== App.state.runtime.request || requestId !== request.id) return;
+      request.timedOut = true;
+      request.controller.abort();
       App.state.runtime.connection.kind = 'err';
       App.state.runtime.connection.detail = `Request did not return within ${timeoutMs}ms`;
       App.state.runtime.connection.hasFetched = true;
       App.render.renderConnectionPill();
       App.state.runtime.lastResponseMs = null;
       App.state.runtime.lastRenderMs = null;
-      App.render.renderResponseTime();
-      if (App.render.renderRenderTime) App.render.renderRenderTime();
+      App.render.renderMetrics();
     }, timeoutMs);
   }
 
@@ -103,17 +105,25 @@
     request.id += 1;
     request.controller = new AbortController();
     request.cause = cause;
+    request.timedOut = false;
     const requestId = request.id;
 
     App.polling.onRefreshDispatched(cause, startAt);
     scheduleRequestTimeout(cause, requestId);
 
     const signal = request.controller.signal;
+    const countQuery = App.query.buildCountQuery();
+    const countScope = JSON.stringify([App.derive.apiBase(), countQuery]);
+    if (App.state.runtime.countScope !== countScope) {
+      App.state.runtime.totalCount = null;
+      App.state.runtime.totalPages = Math.max(1, App.state.runtime.currentPage);
+      App.state.runtime.countScope = countScope;
+    }
     const logsPromise = runQuery(App.query.buildPagedQuery(App.state.runtime.currentPage), signal);
-    const countPromise = cause === 'poll' ? Promise.resolve(null) : runQuery(App.query.buildCountQuery(), signal);
+    const countPromise = cause === 'poll' ? Promise.resolve(null) : runQuery(countQuery, signal);
     const [logsResult, countResult] = await Promise.allSettled([logsPromise, countPromise]);
 
-    if (requestId !== App.state.runtime.request.id) {
+    if (request !== App.state.runtime.request || requestId !== request.id) {
       return { started: false, stale: true };
     }
 
@@ -124,10 +134,17 @@
     const elapsed = Date.now() - startAt;
 
     const logsError = logsResult.status === 'rejected' ? logsResult.reason : null;
-    const countError = countResult.status === 'rejected' ? countResult.reason : null;
+    let countError = countResult.status === 'rejected' ? countResult.reason : null;
+    let count = null;
+    if (cause !== 'poll' && !countError) {
+      const rows = countResult.value;
+      const raw = rows.length === 1 ? rows[0].c : undefined;
+      count = typeof raw === 'number' || (typeof raw === 'string' && /^\d+$/.test(raw)) ? Number(raw) : NaN;
+      if (!Number.isSafeInteger(count) || count < 0) countError = malformedResponseError();
+    }
 
     if (logsError && isAbortError(logsError)) {
-      return { started: false, aborted: true };
+      return { started: false, ok: false, aborted: true, timedOut: request.timedOut };
     }
 
     if (logsError && isQueryRejectedError(logsError)) {
@@ -140,8 +157,7 @@
       if (App.render.markSearchInvalid) App.render.markSearchInvalid(App.state.runtime.committedSearch);
       if (cause !== 'poll' && App.toasts) App.toasts.error('Query rejected, check LogsQL syntax');
       App.render.renderConnectionPill();
-      App.render.renderResponseTime();
-      if (App.render.renderRenderTime) App.render.renderRenderTime();
+      App.render.renderMetrics();
       App.polling.onRefreshCompleted(cause, { ok: false, queryRejected: true, aborted: false });
       return { started: true, ok: false, queryRejected: true };
     }
@@ -153,8 +169,7 @@
       App.state.runtime.connection.detail = connectionErrorDetail(logsError);
       App.state.runtime.connection.hasFetched = true;
       App.render.renderConnectionPill();
-      App.render.renderResponseTime();
-      if (App.render.renderRenderTime) App.render.renderRenderTime();
+      App.render.renderMetrics();
       if (!App.state.runtime.currentLogs.length) {
         App.render.renderError(connectionErrorDetail(logsError));
       }
@@ -163,12 +178,11 @@
     }
 
     const logs = logsResult.status === 'fulfilled' ? logsResult.value : [];
-    if (!countError && countResult.value) {
-      const totalRows = countResult.value;
-      App.state.runtime.totalCount = (totalRows[0] && totalRows[0].c) || 0;
-    }
-
-    App.state.runtime.totalPages = Math.max(1, Math.ceil(App.state.runtime.totalCount / parseInt(App.state.config.logview.rowcount, 10)));
+    if (cause !== 'poll') App.state.runtime.totalCount = countError ? null : count;
+    const pageSize = Number(App.state.config.logview.rowcount);
+    App.state.runtime.totalPages = App.state.runtime.totalCount === null
+      ? App.state.runtime.currentPage + (logs.length >= pageSize ? 1 : 0)
+      : Math.max(1, Math.ceil(App.state.runtime.totalCount / pageSize));
     if (App.state.runtime.currentPage > App.state.runtime.totalPages) {
       App.state.runtime.currentPage = App.state.runtime.totalPages;
       // The completed response is for an out-of-range page; refetch the clamped page instead of rendering stale data.
@@ -184,15 +198,17 @@
 
     const renderStartedAt = Date.now();
     App.render.renderLogs(logs);
-    App.render.renderStats();
-    App.render.renderPagination();
-    App.render.renderResponseTime();
+    App.render.renderPagination(false);
     App.render.renderConnectionPill();
     App.state.runtime.lastRenderMs = Date.now() - renderStartedAt;
-    if (App.render.renderRenderTime) App.render.renderRenderTime();
+    App.render.renderMetrics();
 
     if (countError) {
-      console.error('[aerolog] count query failed:', countError);
+      App.state.runtime.connection.kind = 'err';
+      App.state.runtime.connection.detail = request.timedOut ? 'Log count request timed out' : `Log count unavailable: ${countError.message}`;
+      App.render.renderConnectionPill();
+      if (cause !== 'poll') App.toasts.error(App.state.runtime.connection.detail);
+      return { started: true, ok: false, partial: true, timedOut: request.timedOut };
     }
 
     App.polling.onRefreshCompleted(cause, { ok: true, elapsed, aborted: false });

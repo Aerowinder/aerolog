@@ -4,7 +4,7 @@ function loadAppWithShortcuts() {
   const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'actions.js', 'shortcuts.js']);
   installActionStubs(App);
   const calls = [];
-  const origGoPage = App.actions.goPage;
+  App.state.runtime.totalCount = 900;
   App.actions.goPage = (page) => {
     calls.push(`goPage:${page}`);
     App.state.runtime.currentPage = Math.max(1, Math.min(App.state.runtime.totalPages, page));

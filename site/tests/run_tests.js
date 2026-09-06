@@ -12,6 +12,7 @@ require('./input_focus_style.test');
 require('./events.test');
 require('./heartbeats.test');
 require('./render.test');
+require('./browser_smoke.test');
 
 let failed = 0;
 (async function run() {

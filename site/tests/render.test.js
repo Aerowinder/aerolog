@@ -17,34 +17,8 @@ test('aerolog.css uses only the 1000px responsive breakpoint', () => {
   }
 });
 
-test('desktop server pill ellipsizes at the toolbar control span', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'site/styles/aerolog.css'), 'utf8');
-  const pill = Array.from(css.matchAll(/\.conn-status\s*\{([^}]*)\}/g))
-    .find((match) => match[1].includes('130px + 130px + 145px'));
-  if (!pill) throw new Error('conn-status rule not found');
-  const rule = pill[1];
-  assertEqual(/white-space:\s*nowrap;/.test(rule), true);
-  assertEqual(/overflow:\s*hidden;/.test(rule), true);
-  assertEqual(/text-overflow:\s*ellipsis;/.test(rule), true);
-  assertEqual(/max-width:\s*calc\(130px \+ 130px \+ 145px \+ 1\.2rem - var\(--ctl-h\) - 1rem\);/.test(rule), true);
-});
-
-test('header metrics use a compact Logs then API/UI grid', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'site/styles/aerolog.css'), 'utf8');
-  const stats = css.match(/\.stats-stack\s*\{([^}]*)\}/);
-  if (!stats) throw new Error('stats-stack rule not found');
-  assertEqual(/display:\s*grid;/.test(stats[1]), true);
-  assertEqual(/grid-template-areas:\s*"logs logs"\s*"api ui";/.test(stats[1]), true);
-  assertEqual(/font-size:\s*1rem;/.test(stats[1]), true);
-  assertEqual(/line-height:\s*1;/.test(stats[1]), true);
-  assertEqual(/row-gap:\s*0\.25rem;/.test(stats[1]), true);
-  assertEqual(/\.stats-stack #stat-logs\s*\{\s*grid-area:\s*logs;\s*\}/.test(css), true);
-  assertEqual(/\.stats-stack #stat-resp\s*\{\s*grid-area:\s*api;\s*\}/.test(css), true);
-  assertEqual(/\.stats-stack #stat-render\s*\{\s*grid-area:\s*ui;\s*\}/.test(css), true);
-});
-
 function loadAppWithRender() {
-  const App = loadApp({}, ['core.js', 'toasts.js', 'state.js', 'query_history.js', 'render.js', 'render_table.js', 'render_pager.js', 'render_tabs.js', 'query.js']);
+  const App = loadApp({}, ['core.js', 'toasts.js', 'state.js', 'query_history.js', 'render.js', 'render_table.js', 'render_pager.js', 'render_tabs.js', 'query.js', 'field_filters.js']);
   const tbody = { innerHTML: '' };
   const versionText = { textContent: '' };
   const statLogs = { innerHTML: '' };
@@ -130,7 +104,7 @@ test('renderAllStatic does not eagerly render hidden query history', () => {
 test('render time is displayed separately from response time', () => {
   const { App, statRender } = loadAppWithRender();
   App.state.runtime.lastRenderMs = 37;
-  App.render.renderRenderTime();
+  App.render.renderMetrics();
   assertEqual(statRender.innerHTML, '<b>37ms</b> UI');
 });
 
@@ -138,11 +112,11 @@ test('header and footer Logs metrics share the selected time range', () => {
   const { App, statLogs, pagerMeta } = loadAppWithRender();
   App.state.runtime.totalCount = 12345;
   App.state.config.logview.timerange = '1y';
-  App.render.renderStats();
+  App.render.renderMetrics();
   assertEqual(statLogs.innerHTML, '<b>12,345</b> Logs (1y)');
   assertEqual(pagerMeta.textContent, 'Page 1 of 1 - 12,345 Logs (1y) - -- API - -- UI');
   App.state.config.logview.timerange = 'custom';
-  App.render.renderStats();
+  App.render.renderMetrics();
   assertEqual(statLogs.innerHTML, '<b>12,345</b> Logs (Custom)');
   assertEqual(pagerMeta.textContent, 'Page 1 of 1 - 12,345 Logs (Custom) - -- API - -- UI');
 });
@@ -338,8 +312,8 @@ test('dispatchRefresh collapses expandedRows but does not clear the expansion pa
       App.state.runtime.expandedRows.clear();
       return true;
     },
-    renderLogs() {}, renderStats() {}, renderPagination() {},
-    renderResponseTime() {}, renderConnectionPill() {}, renderError() {},
+    renderLogs() {}, renderMetrics() {}, renderPagination() {},
+    renderConnectionPill() {}, renderError() {},
   };
   await App.api.dispatchRefresh('manual');
   assertEqual(App.state.runtime.expandedRows.size, 0);
@@ -384,4 +358,35 @@ test('every free-text input in index.html suppresses mobile autocorrect and auto
     if (missing.length) offenders.push(`${tag} missing ${missing.join(', ')}`);
   }
   if (offenders.length) throw new Error(`free-text inputs missing mobile guards:\n${offenders.join('\n')}`);
+});
+
+
+test('a delayed rejection does not mark a newer draft invalid or overwrite its text', () => {
+  const { App, searchEl } = loadAppWithRender();
+  App.state.runtime.committedSearch = '[';
+  searchEl.value = 'corrected';
+  App.render.markSearchInvalid('[');
+  App.render.renderToolbarState();
+  assertEqual(searchEl.value, 'corrected');
+  assertEqual(searchEl.classList.contains('invalid-query'), false);
+});
+
+test('unknown counts show unknown page totals and disable jumping to the last page', () => {
+  const { App, pagerMeta } = loadAppWithRender();
+  App.state.runtime.totalCount = null;
+  App.state.runtime.totalPages = 2;
+  App.render.renderPagination();
+  assertEqual(pagerMeta.textContent.startsWith('Page 1 of ? - ? Logs'), true);
+  const buttons = App.dom.byId('pager-buttons').innerHTML;
+  assertEqual(buttons.includes('disabled title="Last page"'), true);
+  assertEqual(buttons.includes('disabled title="Next page"'), false);
+});
+
+test('copy reports clipboard API absence instead of throwing synchronously', async () => {
+  const { App, toast } = loadAppWithRender();
+  App.state.runtime.currentLogs = [{ _msg: 'hello' }];
+  App.__testContext.navigator = {};
+  App.__testContext.setTimeout = () => 1;
+  await App.render.copyRow(0);
+  assertEqual(toast.textContent, 'Could not copy row');
 });

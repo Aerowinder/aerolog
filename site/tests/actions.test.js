@@ -24,10 +24,10 @@ test('custom time actions apply and clear custom ranges', async () => {
   assertEqual(App.state.config.logview.timecustom.start, '');
   assertDeepEqual(calls, [
     'renderToolbarState',
-    'renderStats',
+    'renderMetrics',
     'dispatchRefresh:settings',
     'renderToolbarState',
-    'renderStats',
+    'renderMetrics',
     'dispatchRefresh:settings',
   ]);
 });
@@ -45,7 +45,7 @@ test('setTimeRange custom reuses an existing valid custom range', async () => {
   const calls = installActionStubs(App);
   await App.actions.setTimeRange('custom');
   assertEqual(App.state.config.logview.timerange, 'custom');
-  assertDeepEqual(calls, ['renderToolbarState', 'renderStats', 'dispatchRefresh:settings']);
+  assertDeepEqual(calls, ['renderToolbarState', 'renderMetrics', 'dispatchRefresh:settings']);
 });
 
 test('setTimeRange custom asks for a range when no valid custom range exists', async () => {
@@ -185,15 +185,15 @@ test('applyFieldFilter appends include and exclude filters to the search box que
 
   App.fieldFilters.open(appTarget);
   assertEqual(menu.innerHTML.includes('APPEND TO QUERY'), true);
-  assertEqual(menu.innerHTML.includes('app:&quot;sshd&quot;'), true);
+  assertEqual(menu.innerHTML.includes('app:=&quot;sshd&quot;'), true);
   await App.actions.applyFieldFilter('include');
-  assertEqual(App.state.runtime.committedSearch, 'error app:"sshd"');
+  assertEqual(App.state.runtime.committedSearch, '(error) app:="sshd"');
   assertEqual(calls.includes('dispatchRefresh:manual'), true);
 
   search.value = App.state.runtime.committedSearch;
   App.fieldFilters.open(appTarget);
   await App.actions.applyFieldFilter('exclude');
-  assertEqual(App.state.runtime.committedSearch, 'error app:"sshd" NOT (app:"sshd")');
+  assertEqual(App.state.runtime.committedSearch, '((error) app:="sshd") NOT (app:="sshd")');
 });
 
 test('setMessageLines persists line count and updates the document attribute', () => {

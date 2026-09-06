@@ -36,6 +36,7 @@ function loadAppWithEvents() {
     applyPolling() { App.__appliedPolling = true; },
   };
   App.modals = {
+    containFocus() {},
     openSettingsModal() {},
     closeSettingsModal() {},
     doneSettingsModal() { App.__doneSettings = true; },

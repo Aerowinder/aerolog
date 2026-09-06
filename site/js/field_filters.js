@@ -9,21 +9,22 @@
   }
 
   function fieldValue(raw) {
-    const value = String(raw ?? '').trim();
-    return value || '';
-  }
-
-  function quoteQueryValue(value) {
-    return utils.quoteLogsQlValue(value);
+    return String(raw ?? '');
   }
 
   function friendlyClause(field, value) {
-    return `${field}:${quoteQueryValue(value)}`;
+    return `${field}:=${utils.quoteLogsQlValue(value)}`;
+  }
+
+  function canFilterDetail(field, value) {
+    return field !== '_time' && field !== '_msg' && value != null && value !== ''
+      && /^[A-Za-z_][A-Za-z0-9_]*$/.test(field);
   }
 
   function rawFieldClause(field, value) {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(field)) return null;
-    return `${field}:=${quoteQueryValue(value)}`;
+    const name = Object.prototype.hasOwnProperty.call(App.FIELD_REGISTRY, field.toLowerCase())
+      ? utils.quoteLogsQlValue(field) : field;
+    return `${name}:=${utils.quoteLogsQlValue(value)}`;
   }
 
   function tableCellFilter(rowIndex, columnId) {
@@ -37,14 +38,14 @@
 
     if (columnId === 'priority') {
       const value = fieldValue(log.severity);
-      return value ? { field: 'severity', value, clause: `sev:${value}` } : null;
+      return value ? { field: 'severity', value, clause: friendlyClause('sev', value) } : null;
     }
 
     if (columnId === 'facility') {
       const keyword = fieldValue(log.facility_keyword);
       if (keyword) return { field: 'facility', value: keyword, clause: friendlyClause('fac', keyword) };
       const number = fieldValue(log.facility);
-      return number ? { field: 'facility_num', value: number, clause: `facility_num:${number}` } : null;
+      return number ? { field: 'facility_num', value: number, clause: friendlyClause('facility_num', number) } : null;
     }
 
     if (columnId === 'app_name') {
@@ -59,12 +60,8 @@
     const log = App.state.runtime.currentLogs[rowIndex];
     if (!log || field === '_time' || field === '_msg') return null;
 
-    if (field === 'facility') {
-      return tableCellFilter(rowIndex, 'facility');
-    }
-
     const value = fieldValue(log[field]);
-    const clause = value ? rawFieldClause(field, value) : null;
+    const clause = canFilterDetail(field, log[field]) ? rawFieldClause(field, value) : null;
     return clause ? { field, value, clause } : null;
   }
 
@@ -162,17 +159,14 @@
     return Boolean(menu && menu.contains(target));
   }
 
-  function appendClause(query, clause) {
-    return [String(query || '').trim(), clause].filter(Boolean).join(' ');
-  }
-
   function buildAppliedQuery(mode, baseQuery) {
     if (!currentFilter) return String(baseQuery || '').trim();
     const clause = mode === 'exclude' ? `NOT (${currentFilter.clause})` : currentFilter.clause;
-    return appendClause(baseQuery, clause);
+    return App.query.appendFilter(baseQuery, clause);
   }
 
   App.fieldFilters = {
+    canFilterDetail,
     open,
     close,
     menuContains,

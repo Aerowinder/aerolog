@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.32
+- Let Aliases, Tabs, and Heartbeats modals expand with their content up to the dialog height limit.
+- Fixed searches escaping the selected host tab or time range when using OR.
+- Preserved quoted search values and made click-to-filter match the exact field value selected.
+- Fixed stale results after resetting settings, background polling, and misleading counts after failed requests.
+- Improved config restore, startup-default handling, and reporting when browser settings cannot be saved.
+- Fixed Escape changing scroll position or discarding search drafts, and improved keyboard focus in dialogs.
+- Reduced repeated rendering.
+
 ## 1.31
 - Increased the header metric text size and spacing for readability.
 - Added the selected time range to the Logs metric in the header and pager.

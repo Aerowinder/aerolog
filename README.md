@@ -100,6 +100,10 @@ Click the gear icon in the top-right corner of the page.
 - **Config Management**: export your tabs, aliases, query history, log table layout, and other UI settings to a JSON file you can import elsewhere, or restore them from backup
 - **GitHub link**: the Settings modal header includes a direct link to the project page
 
+Aliases and tab-host text boxes grow with their contents, letting their dialogs expand up to 90% of the viewport height. Short lists keep the original minimum size; longer text scrolls once the available space is filled. Heartbeats also grows up to the dialog height limit.
+
+Dialogs focus their container without activating a control, keep Tab navigation within the active dialog, and restore focus when closed. Escape closes the active dialog; with no dialog open it does not move the page or replace a search draft.
+
 Most Settings controls apply immediately. The server field is applied when it loses focus or when you click **Done**. Pressing `Esc` while editing the server field abandons that edit.
 
 ### Tabs
@@ -173,6 +177,8 @@ In the history dropdown, use `P` to pin a query to the top, `D` to use a query o
 
 Click a structured log value to open a small menu for adding it to the search as an include or exclude filter. Hostname, severity, facility, app, and expanded extra fields are filterable. Timestamp and message text are not filterable from the table.
 
+Click-generated filters use exact values, so a literal `*` in a log value is not treated as a wildcard. Expanded-field filters use the raw field you clicked. Filters are inserted before any pipeline and apply to the whole existing filter expression.
+
 On mobile-width screens, the same menu opens as a bottom sheet so the include/exclude controls have enough tap space.
 
 ### Heartbeats
@@ -202,7 +208,7 @@ Shortcuts are inactive while you are typing in a text field (including `?`, so y
 
 Aerolog sends queries through to VictoriaLogs as LogsQL, with some friendly rewrites and wildcard sugar layered on top.
 
-If VictoriaLogs rejects a submitted query, Aerolog shows an error toast and marks the search text red. The red state clears when you edit the query. Automatic poll retries remain quiet, and a rejected query does not make an active polling connection appear offline.
+If VictoriaLogs rejects a submitted query, Aerolog shows an error toast and marks the search text red. The red state clears when you edit the query; a delayed rejection of an older query does not mark your new draft invalid. Automatic poll retries remain quiet, and a rejected query does not make an active polling connection appear offline.
 
 One important detail: `*` wildcard handling is **Aerolog behavior**, not official LogsQL syntax. Native LogsQL uses exact matching with `:=` and regex matching with `:~`.
 
@@ -227,6 +233,8 @@ For friendly rewritten fields:
 - Explicit operators like `:=` and `:~` are still respected as exact and regex matches
 
 `sev:` is a direct shorthand for `severity:` and keeps VictoriaLogs severity syntax.
+
+Quoted exact and regex values retain their original escaping and whitespace, including empty strings. Double quotes, single quotes, and backticks are recognized. An `OR` search remains constrained by the selected time range and host tab; pipeline stages remain outside those filter parentheses.
 
 Examples:
 
@@ -278,7 +286,7 @@ Aerolog also supports severity convenience filtering such as:
 - `sev:<4`
 - `sev:3`
 
-Anything valid in LogsQL should still work. Aerolog is helping a little, not inventing a whole replacement query language.
+Aerolog supports common LogsQL filters and pipelines, but is not a full LogsQL parser. Quote a raw field name to bypass friendly rewriting—for example, `"facility":="4"` targets the numeric raw field.
 
 ## Polling and the connection pill
 
@@ -300,7 +308,7 @@ A few behavior notes:
 - If polling is paused, the indicator goes gray even if the server is offline
 - If pagination or other runtime state pauses effective polling, the Poll control displays `Off` without overwriting the saved poll preference
 
-The header keeps app identity on the left, the selected-range Logs metric on the first centered line (for example, `12,345 Logs (1y)`), API and UI on the second, and connection status plus Settings on the right. The pager repeats the same metric snapshot, so its Logs/API/UI values match the header. The compact two-line metrics fit within the existing header height. On desktop, the server pill stays on one line and truncates only after the combined width of the Poll, Rows, and Last controls, with room reserved for Settings. This header layout is still being refined. Mobile keeps the pill to one line. Render time measures Aerolog's synchronous table/UI update work; it does not include browser paint or GPU compositing.
+The header keeps app identity on the left, the selected-range Logs metric on the first centered line (for example, `12,345 Logs (1y)`), API and UI on the second, and connection status plus Settings on the right. The pager repeats the same metric snapshot, so its Logs/API/UI values match the header. The compact two-line metrics fit within the existing header height. On desktop, the server pill stays on one line and truncates only after the combined width of the Poll, Rows, and Last controls, with room reserved for Settings. This header layout is still being refined. Mobile keeps the pill to one line. Render time measures synchronous table, pager-button, and connection-pill updates; the final timing-label update, browser paint, and GPU compositing are excluded.
 - The progress bar remains visible as part of the pill state
 - The next poll is anchored to **when the request is sent**, not when the response returns
 - Manual refresh-causing actions re-anchor the next poll countdown from that send time
@@ -332,6 +340,8 @@ The pager at the bottom lets you walk back through history.
 
 On non-mobile viewports, the pager uses as many numbered page buttons as fit, up to 15, and keeps the current page centered when possible. On mobile viewports, 1000px wide or below, Aerolog switches to compact first/previous/next/last controls to preserve horizontal space.
 
+If the log rows load but the count request fails, Aerolog keeps the available rows, reports the failure, and displays `?` for the count and total pages. Numbered pages and Last/End are unavailable until a count succeeds; Previous and Next remain usable where the loaded rows allow them. A changed query or server never reuses the previous count.
+
 The footer also shows page position plus Logs, API, and UI timings. Non-mobile wording is `Page 20 of 50 - 12,345 Logs - 82ms API - 50ms UI`; mobile wording shortens only the page position, to `Page 20/50 - 12,345 Logs - 82ms API - 50ms UI`.
 
 When you leave page 1, polling pauses automatically. That is intentional. Live polling while you are paging backward would shift offsets and make the view jump around like an idiot.
@@ -361,7 +371,9 @@ Config export/import groups Settings modal choices under `settings`, with table-
 
 Because of that, a fresh browser or machine will not have your setup unless you import a previously exported config JSON.
 
-Aerolog validates the exported settings schema version before importing. Pre-1.00 exports are rejected. Newer exports are accepted and migrated forward when the config shape changes.
+Imports require an explicit integer `settings_version` of at least `100`; pre-1.00 and unversioned files are rejected. Registered migrations run before validation. Future version numbers are accepted, but only recognized settings are applied.
+
+Import returns to All Logs. A backup with no startup default clears the previous default, and a backup with no saved custom range clears the previous saved range. Import can restore the saved polling preference; existing runtime pauses remain in effect, and changing the server through import pauses polling. If browser storage cannot save every imported group, Aerolog reports that the config was applied for this session but was not fully saved.
 
 ## Ingest examples
 
@@ -395,7 +407,7 @@ If you have Node on your PATH, you can also run:
 npm test
 ```
 
-The runner loads subsystem test files from `site/tests/*.test.js` through a shared helper harness. The tests focus on query rewriting, alias-aware host matching, query history defaults, config persistence/import helpers, responsive pagination, action sequencing, polling/API refresh behavior, modals, delegated events, Heartbeats, and log-table rendering. A tiny browser smoke-test page is also available at `site/tests/index.html`. These tests do not replace manual UI testing against a VictoriaLogs instance.
+The runner loads subsystem test files from `site/tests/*.test.js` through a shared helper harness. The tests focus on query rewriting, alias-aware host matching, query history defaults, config persistence/import helpers, responsive pagination, action sequencing, polling/API refresh behavior, modals, delegated events, Heartbeats, and log-table rendering. A browser smoke-test page is also available at `site/tests/index.html`. The Node runner executes the same smoke scripts against the declared fixture to catch missing dependencies; actual browser layout and focus behavior still need browser checks. These tests do not replace manual UI testing against a VictoriaLogs instance.
 
 ## Current design goals
 

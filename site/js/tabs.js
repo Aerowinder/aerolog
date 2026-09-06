@@ -6,10 +6,6 @@
     return App.state.config.tabs.find((tab) => tab.id === App.state.runtime.editingTabId) || null;
   }
 
-  async function activateTab(tabId) {
-    await App.actions.activateTab(tabId);
-  }
-
   async function goPage(page) {
     await App.actions.goPage(page);
     const pager = document.querySelector('.pagination');
@@ -35,6 +31,7 @@
     dom.byId('tab-modal-title').textContent = `Edit: ${tab.name}`;
     dom.byId('tab-list-view').style.display = 'none';
     dom.byId('tab-edit-view').style.display = 'block';
+    App.modals.fitTextareas('tab-modal');
   }
 
   function closeTabEdit() {
@@ -43,6 +40,7 @@
     dom.byId('tab-list-view').style.display = 'block';
     dom.byId('tab-edit-view').style.display = 'none';
     App.render.renderTabList();
+    App.modals.fitTextareas('tab-modal');
   }
 
   async function addTab() {
@@ -58,6 +56,7 @@
     }
     dom.byId('new-tab-name').value = '';
     dom.byId('new-tab-hosts').value = '';
+    App.modals.fitTextareas('tab-modal');
     await App.actions.addTab({ name, hosts });
   }
 
@@ -86,12 +85,7 @@
     await App.actions.deleteTab(tabId);
   }
 
-  function moveTab(tabId, direction) {
-    App.actions.moveTab(tabId, direction);
-  }
-
   App.tabs = {
-    activateTab,
     goPage,
     openTabModal,
     closeTabModal,
@@ -100,6 +94,5 @@
     addTab,
     saveTabEdit,
     deleteTabFromEdit,
-    moveTab,
   };
 })();

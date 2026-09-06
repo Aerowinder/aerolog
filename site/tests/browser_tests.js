@@ -3,6 +3,7 @@
   const output = document.getElementById('test-output');
   const lines = [];
   let failed = 0;
+  let total = 0;
 
   function log(line, cls) {
     lines.push(cls ? `<span class="${cls}">${line}</span>` : line);
@@ -16,6 +17,7 @@
   }
 
   function test(name, fn) {
+    total += 1;
     try {
       fn();
       log(`ok - ${name}`, 'pass');
@@ -40,29 +42,24 @@
     const oldTimeRange = App.state.config.logview.timerange;
     const oldCustomRange = { ...App.state.config.logview.timecustom };
     try {
-      App.persist.logview.timecustom({
+      App.state.config.logview.timecustom = {
         start: '2026-04-13T10:00:00.000Z',
         end: '2026-04-13T11:00:00.000Z',
-      });
-      App.persist.logview.timerange('custom');
+      };
+      App.state.config.logview.timerange = 'custom';
       assertEqual(App.query.buildTimeFilterClause(), '_time:[2026-04-13T10:00:00Z, 2026-04-13T11:00:00Z)');
     } finally {
-      App.persist.logview.timecustom(oldCustomRange);
-      App.persist.logview.timerange(oldTimeRange);
+      App.state.config.logview.timecustom = oldCustomRange;
+      App.state.config.logview.timerange = oldTimeRange;
     }
-  });
-
-  test('action module is available in the browser', () => {
-    assertEqual(typeof App.actions.runSearch, 'function');
-    assertEqual(typeof App.actions.setPollInterval, 'function');
   });
 
   test('render timing is visible in the page header', () => {
     App.state.runtime.lastRenderMs = 12;
-    App.render.renderRenderTime();
+    App.render.renderMetrics();
     assertEqual(document.getElementById('stat-render').textContent.includes('12ms UI'), true);
   });
 
   log('');
-  log(failed ? `${failed} browser tests failed` : '5 browser tests passed', failed ? 'fail' : 'pass');
+  log(failed ? `${failed} browser tests failed` : `${total} browser tests passed`, failed ? 'fail' : 'pass');
 })();

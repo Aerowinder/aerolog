@@ -12,6 +12,8 @@
 
   App.actions.runSearch = async function runSearch(query, cause = 'manual') {
     App.state.runtime.committedSearch = String(query || '').trim();
+    App.dom.byId('search').value = App.state.runtime.committedSearch;
+    App.render.clearSearchInvalidOnEdit(App.state.runtime.committedSearch);
     App.queryHistory.recordRecent(App.state.runtime.committedSearch);
     App.state.runtime.currentPage = 1;
     App.render.renderToolbarState();
@@ -60,7 +62,7 @@
     App.persist.logview.timerange(value);
     App.state.runtime.currentPage = 1;
     App.render.renderToolbarState();
-    App.render.renderStats();
+    App.render.renderMetrics();
     return App.api.dispatchRefresh('settings');
   };
 
@@ -74,7 +76,7 @@
     App.persist.logview.timerange('custom');
     App.state.runtime.currentPage = 1;
     App.render.renderToolbarState();
-    App.render.renderStats();
+    App.render.renderMetrics();
     return App.api.dispatchRefresh('settings');
   };
 
@@ -83,7 +85,7 @@
     App.persist.logview.timerange(App.DEFAULTS.logview.timerange);
     App.state.runtime.currentPage = 1;
     App.render.renderToolbarState();
-    App.render.renderStats();
+    App.render.renderMetrics();
     return App.api.dispatchRefresh('settings');
   };
 

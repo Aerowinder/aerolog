@@ -3,7 +3,6 @@ const { fs, path, ROOT, loadApp, createClassList, test, assertEqual, assertDeepE
 test('display and package versions stay in sync', () => {
   const App = loadApp({}, ['core.js']);
   const packageVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
-  assertEqual(App.VERSION, '1.31');
   assertEqual(packageVersion, App.VERSION);
 });
 
@@ -256,6 +255,7 @@ test('pagination grows to an odd intermediate range as space allows', () => {
   App.__testContext.document.getElementById = (id) => elements[id];
   App.state.runtime.currentPage = 20;
   App.state.runtime.totalPages = 50;
+  App.state.runtime.totalCount = 5000;
   App.state.runtime.totalCount = 12345;
   App.state.runtime.lastResponseMs = 82;
 
@@ -278,6 +278,7 @@ test('pagination caps the wide numbered range at fifteen pages', () => {
   App.__testContext.document.getElementById = (id) => elements[id];
   App.state.runtime.currentPage = 20;
   App.state.runtime.totalPages = 50;
+  App.state.runtime.totalCount = 5000;
 
   App.render.renderPagination();
 
@@ -286,7 +287,7 @@ test('pagination caps the wide numbered range at fifteen pages', () => {
   assertEqual(elements['pager-buttons'].innerHTML.includes('data-page="13"'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('data-page="27"'), true);
   assertEqual(elements['pager-buttons'].innerHTML.includes('Page 20 of 50'), true);
-  assertEqual(elements['pager-meta'].textContent, 'Page 20 of 50 - 0 Logs (1h) - -- API - -- UI');
+  assertEqual(elements['pager-meta'].textContent, 'Page 20 of 50 - 5,000 Logs (1h) - -- API - -- UI');
 });
 
 test('config export maps internal columns to compact export keys', () => {
@@ -294,7 +295,7 @@ test('config export maps internal columns to compact export keys', () => {
   App.persist.logview.colwidths({ widths: { _time: 240, hostname: 180, priority: 100, facility: 120, app_name: 140 } });
   const exported = App.configIo.buildExportConfig(new Date('2026-04-13T12:34:56Z'));
   assertEqual(exported.settings_version, 100);
-  assertEqual(exported.aerolog_version, '1.31');
+  assertEqual(exported.aerolog_version, App.VERSION);
   assertEqual(exported.export_time, '2026-04-13T12:34:56.000Z');
   assertDeepEqual(exported.logview, {
     rowcount: '100',
@@ -438,6 +439,7 @@ test('config export and import group settings and logview preferences', () => {
   }
 
   App.configIo.applyImportedConfig({
+    settings_version: 100,
     settings: {
       server: 'imported.example:9428/',
       theme: 'system',
@@ -487,6 +489,7 @@ test('config export omits empty custom time range and empty default query', () =
 test('config import applies compact column keys and query defaults', () => {
   const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   App.configIo.applyImportedConfig({
+    settings_version: 100,
     settings: { theme: 'dark' },
     logview: {
       rowcount: '250',
@@ -506,6 +509,7 @@ test('config import applies compact column keys and query defaults', () => {
 test('config import preserves valid custom time ranges and disables invalid custom ranges', () => {
   const App = loadApp({}, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   App.configIo.applyImportedConfig({
+    settings_version: 100,
     logview: {
       timerange: 'custom',
       timecustom: {
@@ -518,6 +522,7 @@ test('config import preserves valid custom time ranges and disables invalid cust
   assertEqual(App.state.config.logview.timecustom.start, '2026-04-13T10:00:00.000Z');
 
   App.configIo.applyImportedConfig({
+    settings_version: 100,
     logview: {
       timerange: 'custom',
       timecustom: {
@@ -535,6 +540,7 @@ test('config import drops defaults that are missing from history', () => {
     aerolog_queryhist: JSON.stringify([{ query: 'old', pinned: true }]),
   }, ['core.js', 'state.js', 'query_history.js', 'query.js', 'settings_migration.js', 'config_io.js']);
   App.configIo.applyImportedConfig({
+    settings_version: 100,
     querydef: 'missing',
     queryhist: [{ query: 'present', pinned: false }],
   });
@@ -548,6 +554,7 @@ test('config import rejects invalid aliases without partially applying earlier s
   let message = '';
   try {
     App.configIo.applyImportedConfig({
+    settings_version: 100,
       settings: { server: 'changed.example:9428' },
       aliases: { host1: 'duplicate', host2: 'duplicate' },
     });
@@ -687,6 +694,7 @@ test('pre-paint theme script reads theme from aerolog_settings and falls back to
         documentElement: { setAttribute(name, value) { if (name === 'data-theme') applied = value; } },
       },
       JSON,
+      window: { matchMedia: () => ({ matches: false }) },
     };
     vm.createContext(context);
     vm.runInContext(script, context);
@@ -726,4 +734,63 @@ test('derive.connectionView produces the right pill state for every connection/a
   App.state.runtime.connection = { kind: 'idle', detail: '', hasFetched: true };
   setCanAutoPoll(false);
   assertEqual(App.derive.connectionView().state, 'paused');
+});
+
+
+test('full backup imports clear absent defaults and reconcile active tabs', () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'query.js', 'settings_migration.js', 'config_io.js']);
+  App.persist.queryhist([{ query: 'old', pinned: true }]); App.persist.querydef('old');
+  App.state.runtime.activeTabId = 123;
+  const backup = App.configIo.buildExportConfig();
+  delete backup.querydef;
+  backup.queryhist = [{ query: 'old', pinned: false }];
+  App.configIo.applyImportedConfig(backup);
+  assertEqual(App.state.config.querydef, '');
+  assertEqual(App.state.config.queryhist[0].pinned, false);
+  assertEqual(App.state.runtime.activeTabId, 0);
+  assertEqual(App.__testContext.localStorage.getItem('aerolog_querydef'), null);
+  App.configIo.applyImportedConfig({ settings_version: 100, querydef: 'old' });
+  assertEqual(App.state.config.queryhist[0].pinned, true);
+});
+
+test('tab validation rejects reserved, fractional and unsafe IDs', () => {
+  const App = loadApp();
+  const tabs = App.validators.tabs([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, 2].map((id) => ({ id, name: 'Tab', hosts: ['host'] })));
+  assertDeepEqual(tabs.map((tab) => tab.id), [2]);
+});
+
+test('imports require an explicit integer settings version', () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'settings_migration.js', 'config_io.js']);
+  for (const version of [undefined, null, 100.5]) {
+    let rejected = false;
+    try { App.configIo.applyImportedConfig({ settings_version: version }); } catch { rejected = true; }
+    assertEqual(rejected, true);
+  }
+});
+
+test('storage read failures allow startup and failed import writes remain visible to callers', () => {
+  const { loadModule } = require('./helpers');
+  const App = loadApp({}, ['core.js']);
+  App.__testContext.console = { error() {} };
+  App.__testContext.localStorage.getItem = () => { throw new Error('storage blocked'); };
+  loadModule(App, 'state.js');
+  assertEqual(App.state.config.settings.server, App.DEFAULTS.settings.server);
+  App.toasts = { error() {} };
+  loadModule(App, 'settings_migration.js'); loadModule(App, 'config_io.js');
+  App.__testContext.localStorage.setItem = () => { throw new Error('quota'); };
+  App.configIo.applyImportedConfig({ settings_version: 100, settings: { theme: 'light' } });
+  assertEqual(App.state.config.settings.theme, 'light');
+  assertEqual(App.state.runtime.importSaved, false);
+});
+
+
+test('import restores polling preferences without clearing pauses and removes absent saved ranges', () => {
+  const App = loadApp({}, ['core.js', 'state.js', 'settings_migration.js', 'config_io.js']);
+  App.state.runtime.polling.pausedForExpansion = true;
+  App.persist.logview.timecustom({ start: '2026-04-13T10:00:00Z', end: '2026-04-13T11:00:00Z' });
+  App.configIo.applyImportedConfig({ settings_version: 100, settings: { server: 'new.example' }, logview: { pollint: '5', timerange: '1h' } });
+  assertEqual(App.state.config.logview.pollint, '5');
+  assertEqual(App.state.runtime.polling.pausedForExpansion, true);
+  assertEqual(App.state.runtime.polling.pausedForServerChange, true);
+  assertDeepEqual(App.state.config.logview.timecustom, { start: '', end: '' });
 });

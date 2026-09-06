@@ -48,6 +48,8 @@ function loadApp(initialStorage = {}, modules = ['core.js', 'state.js', 'query_h
   const context = {
     console,
     structuredClone,
+    TextEncoder,
+    TextDecoder,
     setTimeout,
     clearTimeout,
     AbortController,
@@ -113,10 +115,11 @@ function installActionStubs(App) {
   const calls = [];
   App.render = {
     renderToolbarState() { calls.push('renderToolbarState'); },
+    clearSearchInvalidOnEdit() {},
     renderTabs() { calls.push('renderTabs'); },
     renderTabList() { calls.push('renderTabList'); },
     renderConnectionPill() { calls.push('renderConnectionPill'); },
-    renderStats() { calls.push('renderStats'); },
+    renderMetrics() { calls.push('renderMetrics'); },
     renderLogs() { calls.push('renderLogs'); },
     renderToolToggles() { calls.push('renderToolToggles'); },
     renderMessageLineSelect() { calls.push('renderMessageLineSelect'); },

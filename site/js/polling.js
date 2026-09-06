@@ -21,7 +21,7 @@
     bar.style.transform = 'scaleX(0)';
   }
 
-  function playProgressBar(startAt, endAt) {
+  function playProgressBar(endAt) {
     const bar = progressBar();
     if (!bar) return;
     cancelProgressAnimation();
@@ -61,7 +61,7 @@
 
   function scheduleFrom(startAt) {
     clearScheduledPoll();
-    if (!App.derive.canAutoPoll()) {
+    if (document.hidden || !App.derive.canAutoPoll()) {
       pauseScheduler(false);
       return;
     }
@@ -70,12 +70,12 @@
     const nextPollAt = startAt + intervalMs;
     App.state.runtime.polling.nextPollAt = nextPollAt;
     App.render.renderConnectionPill();
-    playProgressBar(startAt, nextPollAt);
+    playProgressBar(nextPollAt);
     const delayMs = Math.max(0, nextPollAt - Date.now());
     App.state.runtime.polling.timerId = setTimeout(async () => {
       App.state.runtime.polling.timerId = null;
       if (token !== App.state.runtime.polling.scheduleToken) return;
-      if (!App.derive.canAutoPoll()) return;
+      if (document.hidden || !App.derive.canAutoPoll()) return;
       const result = await App.api.dispatchRefresh('poll');
       if (result && result.reason === 'busy') {
         scheduleFrom(Date.now());
@@ -114,7 +114,7 @@
     const bar = dom.byId('conn-progress');
     if (bar) bar.style.display = App.derive.showProgressBar() ? '' : 'none';
     if (App.derive.canAutoPoll() && App.state.runtime.polling.nextPollAt) {
-      playProgressBar(App.state.runtime.polling.nextPollAt - App.derive.pollIntervalMs(), App.state.runtime.polling.nextPollAt);
+      playProgressBar(App.state.runtime.polling.nextPollAt);
     } else {
       resetProgressBar();
     }
@@ -136,7 +136,7 @@
   }
 
   function applyPolling(cause = 'manual') {
-    if (!App.derive.canAutoPoll()) {
+    if (document.hidden || !App.derive.canAutoPoll()) {
       pauseScheduler();
     }
     App.render.renderConnectionPill();

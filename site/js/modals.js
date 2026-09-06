@@ -2,6 +2,8 @@
   const App = window.Aerolog;
   const { dom } = App;
   let lockedScrollY = 0;
+  const modalStack = [];
+  const previousInert = new Map();
 
   function lockPageScroll() {
     if (document.body.classList.contains('modal-open')) return;
@@ -11,20 +13,91 @@
   }
 
   function unlockPageScroll() {
-    if (document.querySelector('.modal-overlay.open')) return;
+    if (modalStack.length || !document.body.classList.contains('modal-open')) return;
     document.body.classList.remove('modal-open');
     document.body.style.top = '';
     window.scrollTo(0, lockedScrollY);
   }
 
+  function focusableElements(overlay) {
+    return Array.from(overlay.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+      .filter((element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length);
+  }
+
+  function syncModalInert() {
+    const top = modalStack.length ? modalStack[modalStack.length - 1].overlay : null;
+    for (const child of document.body.children) {
+      if (!previousInert.has(child)) previousInert.set(child, child.inert);
+      child.inert = top ? child !== top && child.id !== 'toast' : previousInert.get(child);
+    }
+    if (!top) previousInert.clear();
+  }
+
+  function fitTextarea(textarea) {
+    if (textarea.tagName !== 'TEXTAREA' || !textarea.getClientRects().length) return;
+    const modal = textarea.closest('.modal');
+    if (!modal) return;
+    // Restore the rows-based minimum before measuring wrapped content. The
+    // remaining modal contents reserve room for labels, hints and buttons.
+    textarea.style.height = '';
+    const minimum = textarea.offsetHeight;
+    const border = textarea.offsetHeight - textarea.clientHeight;
+    const otherHeight = modal.scrollHeight - minimum + modal.offsetHeight - modal.clientHeight;
+    const available = Math.max(minimum, window.innerHeight * 0.9 - otherHeight);
+    textarea.style.height = `${Math.min(available, Math.max(minimum, textarea.scrollHeight + border))}px`;
+  }
+
+  function fitTextareas(id) {
+    dom.byId(id).querySelectorAll('textarea').forEach(fitTextarea);
+  }
+
   function openModal(id) {
-    dom.byId(id).classList.add('open');
+    const overlay = dom.byId(id);
+    if (overlay.classList.contains('open')) return;
+    modalStack.push({ overlay, returnFocus: document.activeElement });
+    overlay.classList.add('open');
+    fitTextareas(id);
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.tabIndex = -1;
+    const heading = overlay.querySelector('h3');
+    if (heading) {
+      if (!heading.id) heading.id = `${id}-title`;
+      overlay.setAttribute('aria-labelledby', heading.id);
+    }
     lockPageScroll();
+    syncModalInert();
+    overlay.focus({ preventScroll: true });
   }
 
   function closeModal(id) {
-    dom.byId(id).classList.remove('open');
+    const index = modalStack.findIndex((entry) => entry.overlay.id === id);
+    if (index === -1) return false;
+    const wasTop = index === modalStack.length - 1;
+    const [{ overlay, returnFocus }] = modalStack.splice(index, 1);
+    overlay.classList.remove('open');
+    syncModalInert();
     unlockPageScroll();
+    if (wasTop) {
+      const top = modalStack.length ? modalStack[modalStack.length - 1].overlay : null;
+      const target = returnFocus && returnFocus.isConnected && !returnFocus.closest('[inert]') ? returnFocus : top;
+      if (target) target.focus({ preventScroll: true });
+    }
+    return true;
+  }
+
+  function containFocus(event) {
+    if (event.key !== 'Tab' || !modalStack.length) return;
+    const overlay = modalStack[modalStack.length - 1].overlay;
+    const elements = focusableElements(overlay);
+    const first = elements[0] || overlay;
+    const last = elements[elements.length - 1] || overlay;
+    if (!elements.length || !overlay.contains(document.activeElement)
+      || (event.shiftKey && (document.activeElement === first || document.activeElement === overlay))
+      || (!event.shiftKey && document.activeElement === last)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    }
   }
 
   function openSettingsModal() {
@@ -87,8 +160,7 @@
   }
 
   function closeCustomTimeModal() {
-    closeModal('custom-time-modal');
-    App.render.renderToolbarState();
+    if (closeModal('custom-time-modal')) App.render.renderToolbarState();
   }
 
   async function applyCustomTimeRange() {
@@ -132,7 +204,8 @@
       App.render.renderAllStatic();
       closeSettingsModal();
       await App.polling.applyPolling('settings');
-      App.toasts.success('Config imported');
+      if (App.state.runtime.importSaved) App.toasts.success('Config imported');
+      else App.toasts.error('Config applied for this session, but could not be fully saved. Retry the import when browser storage is available.');
     } catch (err) {
       App.toasts.error(`Config import failed: ${err.message}`);
     } finally {
@@ -149,6 +222,9 @@
   }
 
   App.modals = {
+    fitTextarea,
+    fitTextareas,
+    containFocus,
     openModal,
     closeModal,
     openSettingsModal,

@@ -60,7 +60,7 @@
 
   function goLast() {
     const runtime = App.state.runtime;
-    if (runtime.currentPage === runtime.totalPages) return;
+    if (runtime.totalCount === null || runtime.currentPage === runtime.totalPages) return;
     App.actions.goPage(runtime.totalPages);
   }
 
